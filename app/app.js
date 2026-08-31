@@ -373,3 +373,109 @@ async function initDesktopUpdateUI(){
   });
 }
 document.addEventListener("DOMContentLoaded",initDesktopUpdateUI);
+
+
+/* MyGarage 1.3 - Vehicle Share Cards */
+let shareCarId=null;
+const shareImgCache=new Map();
+
+function shareActiveCar(){
+  return state.cars.find(c=>c.id===shareCarId)||state.cars.find(c=>c.id===state.activeCarId)||state.cars[0];
+}
+function shareCarTitle(c){return [c.make,c.model,c.variant].filter(Boolean).join(" ");}
+function shareMoney(v){const n=Number(v||0);return n?new Intl.NumberFormat("de-DE",{style:"currency",currency:"EUR",maximumFractionDigits:0}).format(n):"—";}
+function roundedRect(ctx,x,y,w,h,r){
+  const rr=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+rr,y);ctx.arcTo(x+w,y,x+w,y+h,rr);ctx.arcTo(x+w,y+h,x,y+h,rr);ctx.arcTo(x,y+h,x,y,rr);ctx.arcTo(x,y,x+w,y,rr);ctx.closePath();
+}
+function fitText(ctx,text,maxWidth,startSize,minSize=24){
+  let s=startSize;do{ctx.font=`800 ${s}px Arial`;if(ctx.measureText(text).width<=maxWidth)return s;s-=2;}while(s>minSize);return minSize;
+}
+async function loadShareImage(src){
+  if(!src)return null;
+  if(shareImgCache.has(src))return shareImgCache.get(src);
+  return await new Promise(resolve=>{
+    const im=new Image();im.onload=()=>{shareImgCache.set(src,im);resolve(im)};im.onerror=()=>resolve(null);im.src=src;
+  });
+}
+function findCarImage(c){
+  const g=(state.gallery||[]).filter(x=>x.carId===c.id);
+  return c.image||c.photo||c.imageData||g[0]?.data||g[0]?.src||g[0]?.image||null;
+}
+function drawCover(ctx,img,x,y,w,h){
+  const ir=img.width/img.height, r=w/h;let sx=0,sy=0,sw=img.width,sh=img.height;
+  if(ir>r){sw=img.height*r;sx=(img.width-sw)/2}else{sh=img.width/r;sy=(img.height-sh)/2}
+  ctx.drawImage(img,sx,sy,sw,sh,x,y,w,h);
+}
+async function renderShareCard(){
+  const c=shareActiveCar(),canvas=document.getElementById("shareCanvas");if(!c||!canvas)return;
+  const format=document.getElementById("shareFormat")?.value||"post";
+  const theme=document.getElementById("shareTheme")?.value||"dark";
+  const purchase=document.getElementById("sharePurchase")?.checked;
+  const brand=document.getElementById("shareBrand")?.checked!==false;
+  canvas.width=1080;canvas.height=format==="story"?1920:1350;
+  const ctx=canvas.getContext("2d"),W=canvas.width,H=canvas.height;
+  const themes={
+    dark:{bg:"#0b0d10",panel:"#15181d",text:"#ffffff",sub:"#a8adb7",accent:"#e33434"},
+    performance:{bg:"#080808",panel:"#121212",text:"#ffffff",sub:"#b6b6b6",accent:"#ff3030"},
+    minimal:{bg:"#f3f1ec",panel:"#ffffff",text:"#111111",sub:"#666666",accent:"#222222"}
+  },t=themes[theme];
+  ctx.fillStyle=t.bg;ctx.fillRect(0,0,W,H);
+  if(theme==="performance"){ctx.fillStyle=t.accent;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(330,0);ctx.lineTo(0,330);ctx.fill()}
+  const pad=70, imageY=format==="story"?180:80, imageH=format==="story"?780:600;
+  roundedRect(ctx,pad,imageY,W-pad*2,imageH,34);ctx.save();ctx.clip();
+  const img=await loadShareImage(findCarImage(c));
+  if(img)drawCover(ctx,img,pad,imageY,W-pad*2,imageH);
+  else{ctx.fillStyle=t.panel;ctx.fillRect(pad,imageY,W-pad*2,imageH);ctx.fillStyle=t.sub;ctx.font="700 34px Arial";ctx.textAlign="center";ctx.fillText("FAHRZEUGBILD",W/2,imageY+imageH/2)}
+  ctx.restore();
+  const grad=ctx.createLinearGradient(0,imageY+imageH*.5,0,imageY+imageH);grad.addColorStop(0,"rgba(0,0,0,0)");grad.addColorStop(1,"rgba(0,0,0,.72)");ctx.fillStyle=grad;ctx.fillRect(pad,imageY,W-pad*2,imageH);
+  const title=shareCarTitle(c)||"Mein Fahrzeug";ctx.textAlign="left";ctx.fillStyle="#fff";const fs=fitText(ctx,title,W-pad*2-70,58,32);ctx.font=`800 ${fs}px Arial`;ctx.fillText(title,pad+35,imageY+imageH-55);
+  let infoY=imageY+imageH+65;
+  ctx.fillStyle=t.text;ctx.font="800 30px Arial";ctx.fillText("FAHRZEUGDATEN",pad,infoY);
+  ctx.fillStyle=t.accent;ctx.fillRect(pad,infoY+18,90,6);
+  infoY+=75;
+  const rows=[
+    ["Baujahr",c.year||"—"],["Leistung",c.ps?`${c.ps} PS`:"—"],["Drehmoment",c.nm?`${c.nm} Nm`:"—"],
+    ["Kraftstoff",c.fuel||"—"],["Getriebe",c.gearbox||"—"]
+  ];
+  if(purchase)rows.push(["Kaufpreis",shareMoney(c.purchase)]);
+  const cols=2, gap=22, boxW=(W-pad*2-gap)/2, boxH=105;
+  rows.forEach((r,i)=>{
+    const x=pad+(i%cols)*(boxW+gap),y=infoY+Math.floor(i/cols)*(boxH+gap);
+    ctx.fillStyle=t.panel;roundedRect(ctx,x,y,boxW,boxH,20);ctx.fill();
+    ctx.fillStyle=t.sub;ctx.font="600 21px Arial";ctx.fillText(r[0].toUpperCase(),x+24,y+34);
+    ctx.fillStyle=t.text;ctx.font="800 30px Arial";ctx.fillText(String(r[1]),x+24,y+75);
+  });
+  if(brand){ctx.fillStyle=t.sub;ctx.font="600 22px Arial";ctx.textAlign="center";ctx.fillText("Made with MyGarage",W/2,H-45)}
+}
+function openShareCard(carId){
+  shareCarId=carId||state.activeCarId;const m=document.getElementById("shareModal");if(!m)return;m.classList.add("open");m.setAttribute("aria-hidden","false");renderShareCard();
+}
+function closeShareCard(){const m=document.getElementById("shareModal");m?.classList.remove("open");m?.setAttribute("aria-hidden","true")}
+async function shareCardBlob(){const c=document.getElementById("shareCanvas");return await new Promise(r=>c.toBlob(r,"image/png",1))}
+async function downloadShareCard(){
+  const blob=await shareCardBlob();if(!blob)return;const car=shareActiveCar();const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`MyGarage-${(shareCarTitle(car)||"Fahrzeug").replace(/[^a-z0-9äöüß]+/gi,"-")}.png`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+}
+async function nativeShareCard(){
+  const blob=await shareCardBlob();if(!blob)return;const file=new File([blob],"MyGarage-Share.png",{type:"image/png"});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({title:"MyGarage",text:"Mein Fahrzeug in MyGarage",files:[file]});return}catch(e){if(e.name==="AbortError")return}}
+  downloadShareCard();
+}
+function ensureShareButtons(){
+  document.querySelectorAll(".car-card").forEach(card=>{
+    if(card.querySelector(".share-car-btn"))return;
+    const id=card.dataset.id||card.getAttribute("data-car-id");
+    if(!id)return;
+    const b=document.createElement("button");b.type="button";b.className="btn ghost share-car-btn";b.textContent="Share Card";b.addEventListener("click",e=>{e.stopPropagation();openShareCard(id)});card.appendChild(b);
+  });
+}
+document.addEventListener("click",e=>{
+  if(e.target?.id==="shareClose")closeShareCard();
+  if(e.target?.id==="shareDownload")downloadShareCard();
+  if(e.target?.id==="shareNative")nativeShareCard();
+  if(e.target?.id==="shareModal")closeShareCard();
+});
+document.addEventListener("change",e=>{if(["shareFormat","shareTheme","sharePurchase","shareBrand"].includes(e.target?.id))renderShareCard()});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeShareCard()});
+const shareObserver=new MutationObserver(()=>ensureShareButtons());
+document.addEventListener("DOMContentLoaded",()=>{ensureShareButtons();const root=document.getElementById("cars")||document.body;shareObserver.observe(root,{childList:true,subtree:true})});
+window.openShareCard=openShareCard;

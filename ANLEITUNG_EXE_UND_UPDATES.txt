@@ -68,3 +68,12 @@ GitHub-Benutzer: xIGriffeN
 Repository: MyGarage
 
 Du musst in package.json dafür nichts mehr ändern.
+
+
+MYGARAGE 1.3.0
+- Share Cards für Fahrzeuge
+- Instagram Post 1080x1350
+- Instagram Story 1080x1920
+- Designs: Clean Dark, Performance, Minimal
+- PNG speichern / System-Share wenn verfügbar
+- Optionales MyGarage Branding
