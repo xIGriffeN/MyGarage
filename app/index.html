@@ -20,6 +20,7 @@
     <button class="nav" data-view="fuel"><span>⛽</span><b>Tankbuch</b></button>
     <button class="nav" data-view="build"><span>🔧</span><b>Umbauten</b></button>
     <button class="nav" data-view="logbook"><span>📸</span><b>Logbuch</b></button>
+    <button class="nav" data-view="stats"><span>📊</span><b>Statistiken</b></button>
     <button class="nav" data-view="more"><span>•••</span><b>Mehr</b></button>
   </aside>
 
@@ -28,7 +29,7 @@
   <main class="app">
     <header class="topbar">
       <div>
-        <div class="eyebrow">MYGARAGE</div>
+        <div class="eyebrow">JIGGY</div>
         <h1 id="pageTitle">Übersicht</h1><p class="page-sub" id="pageSub">Alles Wichtige zu deinem Fahrzeug auf einen Blick.</p>
       </div>
       <select id="globalCar"></select>
@@ -95,7 +96,7 @@
     <div class="card app-update-card">
   <div class="card-head"><div>
     <h3>JIGGY Update</h3>
-    <p class="muted">Installierte Version: <strong id="appVersion">1.2.0</strong></p>
+    <p class="muted">Installierte Version: <strong id="appVersion">1.5.1</strong></p>
   </div></div>
   <button class="btn" id="checkUpdatesBtn" type="button">Nach Updates suchen</button>
   <p class="muted small" id="updateStatus">Updates werden auch automatisch beim Start geprüft.</p>
@@ -112,6 +113,17 @@
               </label>
               <div id="vehicleSuggestions" class="suggestions"></div>
               <small class="form-hint">Tipp: Einfach Marke oder Modell tippen. Technische Daten werden automatisch übernommen.</small>
+            </div>
+            <div class="vehicle-example-preview" id="vehicleExamplePreview">
+              <div class="vehicle-example-visual" id="vehicleExampleVisual"><span>🚘</span></div>
+              <div class="vehicle-example-copy">
+                <strong>Automatisches Beispielbild</strong>
+                <span id="vehicleExampleStatus">Wähle ein Fahrzeug aus der Datenbank.</span>
+                <div class="vehicle-example-actions">
+                  <button type="button" class="mini" id="changeExampleImage" disabled>Anderes Bild</button>
+                  <a id="vehicleExampleCredit" class="image-credit" target="_blank" rel="noreferrer" hidden>Bildquelle</a>
+                </div>
+              </div>
             </div>
             <div class="two">
               <label>Marke<input id="carMake" required placeholder="Audi"></label>
@@ -134,7 +146,7 @@
               <label>Kaufpreis €<input id="carPurchase" type="number" min="0" step="100" placeholder="0"></label>
               <label>Kennzeichen<input id="carPlate" placeholder="WES AB 123"></label>
             </div>
-            <label>Fahrzeugbild<input id="carImage" type="file" accept="image/*"></label>
+            <label>Eigenes Fahrzeugbild <span class="muted">(überschreibt das Beispielbild)</span><input id="carImage" type="file" accept="image/*"></label>
             <button class="primary" type="submit">Fahrzeug speichern</button>
           </form>
         </div>
@@ -266,6 +278,26 @@
       </div>
     </section>
 
+
+    <section id="statsView" class="view">
+      <div class="stats-toolbar card">
+        <div><h3>JIGGY Statistics</h3><p class="muted">Kosten, Tankdaten und Entwicklung deiner Garage.</p></div>
+        <label>Auswertung<select id="statsCarFilter"><option value="active">Aktives Fahrzeug</option><option value="all">Alle Fahrzeuge</option></select></label>
+      </div>
+      <div class="stats stats-kpis">
+        <div class="stat card"><span>Gesamtausgaben</span><strong id="statsTotalCost">0 €</strong><small id="statsTotalSub">inkl. Kaufpreis</small></div>
+        <div class="stat card"><span>Tankkosten</span><strong id="statsFuelCost">0 €</strong><small id="statsFuelSub">0 Tankungen</small></div>
+        <div class="stat card"><span>Ø Verbrauch</span><strong id="statsConsumption">—</strong><small>aus Tankbuch berechnet</small></div>
+        <div class="stat card"><span>Umbauten</span><strong id="statsBuildCost">0 €</strong><small id="statsBuildSub">0 Projekte</small></div>
+      </div>
+      <div class="grid2 stats-grid">
+        <div class="card"><div class="card-head"><div><h3>Kostenaufteilung</h3><p class="muted">Kauf, Tanken, Service und Umbauten</p></div></div><div id="statsCostBars" class="stats-bars"></div></div>
+        <div class="card"><div class="card-head"><div><h3>Tankdaten</h3><p class="muted">Verbrauch und Literpreis</p></div></div><div id="statsFuelFacts" class="stats-facts"></div></div>
+      </div>
+      <div class="card stats-chart-card"><div class="card-head"><div><h3>Ausgaben pro Monat</h3><p class="muted">Letzte 12 Monate ohne Kaufpreis</p></div></div><canvas id="monthlyCostChart" height="300"></canvas></div>
+      <div class="card stats-chart-card"><div class="card-head"><div><h3>Fahrzeugvergleich</h3><p class="muted">Gesamtausgaben je Fahrzeug</p></div></div><div id="vehicleCostCompare" class="vehicle-cost-compare"></div></div>
+    </section>
+
 <section id="moreView" class="view">
       <div class="card">
         <div class="card-head"><h3>Mehr</h3><span>Selten benötigte Funktionen</span></div>
@@ -278,6 +310,7 @@
     </section>
   </main><div id="toastHost" class="toast-host"></div>
 
+<script src="vehicle-db.js"></script>
 <script src="app.js"></script>
 
 <div id="mediaLightbox" class="media-lightbox" aria-hidden="true">

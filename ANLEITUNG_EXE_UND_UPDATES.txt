@@ -93,3 +93,21 @@ JIGGY 1.4.0 REBRANDING
 - Installer/Shortcut: JIGGY
 - Share Cards: JIGGY Branding
 - Technische MyGarage-IDs, GitHub-Repo und Speicherstruktur bleiben absichtlich erhalten.
+
+
+JIGGY 1.5.0
+- Neue Statistik-Seite mit Kosten, Tankdaten, Verbrauch und 12-Monats-Chart.
+- Fahrzeugvergleich nach Gesamtausgaben.
+- Lokale Fahrzeugdatenbank auf 165 kuratierte Varianten erweitert.
+- Automatische Beispielbilder über Wikimedia Commons in der Windows-App.
+- Eigene Fahrzeugbilder haben immer Vorrang.
+- Button „Anderes Bild“ für alternative Beispielbilder.
+- Offline-Fallback im JIGGY-Design, wenn kein Bild verfügbar ist.
+- Bestehende MyGarage Storage-/App-IDs bleiben unverändert.
+
+
+JIGGY 1.5.1
+- Fahrzeugdatenbank erweitert: 342 lokale Varianten.
+- Beispielbilder repariert: Bilder werden jetzt von der Desktop-App geladen, lokal gecacht und über ein internes jiggy-image-Protokoll angezeigt.
+- Robustere Wikimedia-Suche mit mehreren Suchstufen.
+- Alte Remote-Beispielbilder werden automatisch in den lokalen Cache überführt.

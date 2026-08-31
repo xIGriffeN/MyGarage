@@ -8,72 +8,28 @@ const num=v=>new Intl.NumberFormat("de-DE").format(+v||0);
 function toast(text,type="good"){const h=$("toastHost");if(!h)return;const d=document.createElement("div");d.className="toast-msg "+type;d.textContent=text;h.appendChild(d);setTimeout(()=>d.remove(),1800)}
 
 
-const VEHICLE_DB=[
-["Audi","A3 Sportback","35 TFSI",2021,150,250,"Benzin","S tronic"],
-["Audi","A4 Avant","40 TDI",2021,204,400,"Diesel","S tronic"],
-["Audi","A5 Sportback","40 TDI",2021,204,400,"Diesel","S tronic"],
-["Audi","S4 Avant","3.0 TDI quattro",2021,347,700,"Diesel","Tiptronic"],
-["Audi","S4 Limousine","3.0 TDI quattro",2021,347,700,"Diesel","Tiptronic"],
-["Audi","S4 Avant","3.0 TFSI quattro",2018,354,500,"Benzin","Tiptronic"],
-["Audi","RS4 Avant","2.9 TFSI quattro",2021,450,600,"Benzin","Tiptronic"],
-["Audi","A6 Avant","50 TDI quattro",2021,286,620,"Diesel","Tiptronic"],
-["Audi","S6 Avant","3.0 TDI quattro",2021,344,700,"Diesel","Tiptronic"],
-["Audi","RS6 Avant","4.0 TFSI quattro",2021,600,800,"Benzin","Tiptronic"],
-["Audi","Q5","50 TDI quattro",2020,286,620,"Diesel","Tiptronic"],
-["Audi","SQ5","3.0 TDI quattro",2021,341,700,"Diesel","Tiptronic"],
-["BMW","318i","E46 2.0",2002,143,200,"Benzin","Manuell"],
-["BMW","320d","G20",2021,190,400,"Diesel","Steptronic"],
-["BMW","330i","G20",2021,258,400,"Benzin","Steptronic"],
-["BMW","M340i xDrive","G20",2021,374,500,"Benzin","Steptronic"],
-["BMW","M3 Competition","G80",2021,510,650,"Benzin","Steptronic"],
-["BMW","M4 Competition","G82",2021,510,650,"Benzin","Steptronic"],
-["BMW","M5 Competition","F90",2021,625,750,"Benzin","Steptronic"],
-["BMW","X3 M40i","G01",2021,360,500,"Benzin","Steptronic"],
-["Mercedes-Benz","A 35 AMG","4MATIC",2021,306,400,"Benzin","DCT"],
-["Mercedes-Benz","A 45 S AMG","4MATIC+",2021,421,500,"Benzin","DCT"],
-["Mercedes-Benz","C 220 d","W205",2020,194,400,"Diesel","9G-Tronic"],
-["Mercedes-Benz","C 63 S AMG","W205",2020,510,700,"Benzin","MCT"],
-["Mercedes-Benz","E 400 d","4MATIC",2021,330,700,"Diesel","9G-Tronic"],
-["Mercedes-Benz","GLK 250 CDI","4MATIC",2011,204,500,"Diesel","7G-Tronic"],
-["Volkswagen","Golf 2","1.6",1989,70,118,"Benzin","Manuell"],
-["Volkswagen","Golf 3","1.8",1991,90,145,"Benzin","Automatik"],
-["Volkswagen","Golf 7 GTI","2.0 TSI",2019,245,370,"Benzin","DSG"],
-["Volkswagen","Golf 7 R","2.0 TSI 4Motion",2019,300,400,"Benzin","DSG"],
-["Volkswagen","Golf 8 GTI","2.0 TSI",2021,245,370,"Benzin","DSG"],
-["Volkswagen","Golf 8 GTI Clubsport","2.0 TSI",2021,300,400,"Benzin","DSG"],
-["Volkswagen","Golf 8 R","2.0 TSI 4Motion",2021,320,420,"Benzin","DSG"],
-["Volkswagen","Passat Variant","2.0 TDI",2021,200,400,"Diesel","DSG"],
-["Volkswagen","T4","2.5 TDI",1998,102,250,"Diesel","Manuell"],
-["Porsche","Boxster","986 2.5",1998,204,245,"Benzin","Manuell"],
-["Porsche","718 Cayman","2.0",2021,300,380,"Benzin","PDK"],
-["Porsche","911 Carrera","992",2021,385,450,"Benzin","PDK"],
-["Porsche","911 Turbo S","992",2021,650,800,"Benzin","PDK"],
-["Toyota","GR Supra","3.0",2021,340,500,"Benzin","Automatik"],
-["Toyota","GR Yaris","1.6 Turbo AWD",2021,261,360,"Benzin","Manuell"],
-["Honda","Civic Type R","FK8",2021,320,400,"Benzin","Manuell"],
-["Honda","Civic Type R","FL5",2023,329,420,"Benzin","Manuell"],
-["Nissan","GT-R","R35",2021,570,637,"Benzin","DCT"],
-["Ford","Mustang GT","5.0 V8",2021,449,529,"Benzin","Automatik"],
-["Ford","Focus ST","2.3 EcoBoost",2021,280,420,"Benzin","Manuell"],
-["Ford","Fiesta ST","1.5 EcoBoost",2021,200,320,"Benzin","Manuell"],
-["Opel","Omega B","2.0 16V",1998,136,185,"Benzin","Automatik"],
-["Opel","Insignia GSi","2.0 Turbo",2021,230,350,"Benzin","Automatik"],
-["Škoda","Octavia RS","2.0 TSI",2021,245,370,"Benzin","DSG"],
-["Škoda","Octavia RS","2.0 TDI",2021,200,400,"Diesel","DSG"],
-["SEAT","Leon Cupra","2.0 TSI",2020,300,380,"Benzin","DSG"],
-["Cupra","Formentor VZ","2.0 TSI 4Drive",2021,310,400,"Benzin","DSG"],
-["Hyundai","i30 N","2.0 T-GDI",2021,280,392,"Benzin","DCT"],
-["Kia","Stinger GT","3.3 T-GDI AWD",2021,366,510,"Benzin","Automatik"],
-["Tesla","Model 3","Long Range AWD",2021,498,493,"Elektro","1-Gang"],
-["Tesla","Model 3","Performance AWD",2021,513,660,"Elektro","1-Gang"]
-].map((x,i)=>({id:i,make:x[0],model:x[1],variant:x[2],year:x[3],power:x[4],torque:x[5],fuel:x[6],gearbox:x[7]}));
+const VEHICLE_DB=window.JIGGY_VEHICLE_DB||[];
 function vehicleLabel(v){return `${v.make} ${v.model} ${v.variant}`.trim()}
-function fillVehicle(v){
+let pendingExampleImage=null,pendingExampleSkip=0,pendingVehicle=null;
+function setExamplePreview(data,status){
+ const visual=$("vehicleExampleVisual"),credit=$("vehicleExampleCredit"),btn=$("changeExampleImage"),label=$("vehicleExampleStatus");
+ if(!visual)return;
+ if(data?.url){visual.innerHTML=`<img src="${esc(data.url)}" alt="Beispielbild">`;pendingExampleImage=data;label.textContent=status||"Beispielbild gefunden – eigenes Foto hat später Vorrang.";btn.disabled=false;credit.hidden=false;credit.href=data.sourceUrl||"#";credit.textContent=`${data.source||"Wikimedia"}${data.license?` · ${data.license}`:""}`;}
+ else{visual.innerHTML=`<div class="example-fallback"><span>JIGGY.</span><small>${pendingVehicle?esc(`${pendingVehicle.make} ${pendingVehicle.model}`):"Vehicle preview"}</small></div>`;label.textContent=status||"Kein Online-Beispielbild verfügbar. JIGGY nutzt einen lokalen Platzhalter.";credit.hidden=true;btn.disabled=!pendingVehicle;}
+}
+async function loadExampleImageForVehicle(v,skip=0){
+ pendingVehicle=v;pendingExampleSkip=skip;pendingExampleImage=null;
+ setExamplePreview(null,"Suche passendes Beispielbild …");
+ if(!window.myGarageDesktop?.getVehicleImage){setExamplePreview(null,"Beispielbilder werden in der Windows-App automatisch geladen.");return}
+ try{const r=await window.myGarageDesktop.getVehicleImage(v.imageQuery||vehicleLabel(v),skip);if(r?.ok)setExamplePreview(r);else setExamplePreview(null,r?.error||"Kein Beispielbild gefunden.")}catch(e){setExamplePreview(null,"Beispielbild konnte nicht geladen werden.")}
+}
+async function fillVehicle(v){
  $("carMake").value=v.make;$("carModel").value=v.model;$("carVariant").value=v.variant||"";
  $("carYear").value=v.year||"";$("carPower").value=v.power||"";$("carTorque").value=v.torque||"";
  $("carFuel").value=v.fuel||"";$("carGearbox").value=v.gearbox||"";
  $("vehicleSearch").value=vehicleLabel(v);$("vehicleSuggestions").classList.remove("open");
  toast("Fahrzeugdaten übernommen");
+ await loadExampleImageForVehicle(v,0);
 }
 let suggestionIndex=-1;
 function searchVehicles(q){
@@ -100,6 +56,7 @@ $("vehicleSearch").addEventListener("keydown",e=>{
  items.forEach((x,i)=>x.classList.toggle("active",i===suggestionIndex));items[suggestionIndex]?.scrollIntoView({block:"nearest"})
 });
 document.addEventListener("click",e=>{if(!e.target.closest(".smart-search-wrap"))$("vehicleSuggestions")?.classList.remove("open")});
+$("changeExampleImage").onclick=()=>{if(pendingVehicle)loadExampleImageForVehicle(pendingVehicle,pendingExampleSkip+1)};
 
 
 const MEDIA_DB="mygarage.media.v1",MEDIA_STORE="files";
@@ -158,13 +115,14 @@ function show(view){
   document.querySelectorAll(".nav").forEach(v=>v.classList.remove("active"));
   $(view+"View")?.classList.add("active");
   document.querySelector(`.nav[data-view="${view}"]`)?.classList.add("active");
-  const titles={home:"Übersicht",cars:"Fahrzeuge",service:"Service",legal:"TÜV & ABE",fuel:"Tankbuch",build:"Umbauten",logbook:"Logbuch",more:"Mehr"};
-  const subs={home:"Alles Wichtige zu deinem Fahrzeug auf einen Blick.",cars:"Fahrzeuge hinzufügen, auswählen und verwalten.",service:"Wartung und nächste Termine übersichtlich festhalten.",legal:"ABE, Eintragungen und TÜV-Themen einfach dokumentieren.",fuel:"Tankungen und Kraftstoffkosten im Blick behalten.",build:"Geplante und verbaute Umbauten verwalten.",logbook:"Deine Umbauten und Veränderungen als Foto- und Video-Chronik.",more:"Backup und selten benötigte Funktionen."};
+  const titles={home:"Übersicht",cars:"Fahrzeuge",service:"Service",legal:"TÜV & ABE",fuel:"Tankbuch",build:"Umbauten",logbook:"Logbuch",stats:"Statistiken",more:"Mehr"};
+  const subs={home:"Alles Wichtige zu deinem Fahrzeug auf einen Blick.",cars:"Fahrzeuge hinzufügen, auswählen und verwalten.",service:"Wartung und nächste Termine übersichtlich festhalten.",legal:"ABE, Eintragungen und TÜV-Themen einfach dokumentieren.",fuel:"Tankungen und Kraftstoffkosten im Blick behalten.",build:"Geplante und verbaute Umbauten verwalten.",logbook:"Deine Umbauten und Veränderungen als Foto- und Video-Chronik.",stats:"Kosten, Verbrauch und Entwicklung deiner Garage.",more:"Backup und selten benötigte Funktionen."};
   $("pageTitle").textContent=titles[view]||"MyGarage"; $("pageSub").textContent=subs[view]||"";
   $("sidebar").classList.remove("open");
   refreshSelectors();
   renderLogbook();
   renderLists();
+  renderStats();
 }
 document.querySelectorAll(".nav").forEach(b=>b.onclick=()=>show(b.dataset.view));
 document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>show(b.dataset.go));
@@ -196,8 +154,9 @@ async function fileData(file){
 $("carForm").onsubmit=async e=>{
   e.preventDefault();
   let image="";try{image=await fileData($("carImage").files[0])}catch{return alert("Bild bitte kleiner als 3 MB wählen.")}
-  const c={id:uid(),make:$("carMake").value.trim(),model:$("carModel").value.trim(),variant:$("carVariant").value.trim(),year:+$("carYear").value||0,km:+$("carKm").value||0,power:+$("carPower").value||0,torque:+$("carTorque").value||0,fuel:$("carFuel").value.trim(),gearbox:$("carGearbox").value.trim(),purchase:+$("carPurchase").value||0,plate:$("carPlate").value.trim(),image};
-  state.cars.push(c);state.activeCarId=c.id;save();e.target.reset();toast("Fahrzeug gespeichert");render();show("home")
+  const ex=pendingExampleImage||{};
+  const c={id:uid(),make:$("carMake").value.trim(),model:$("carModel").value.trim(),variant:$("carVariant").value.trim(),year:+$("carYear").value||0,km:+$("carKm").value||0,power:+$("carPower").value||0,torque:+$("carTorque").value||0,fuel:$("carFuel").value.trim(),gearbox:$("carGearbox").value.trim(),purchase:+$("carPurchase").value||0,plate:$("carPlate").value.trim(),image,exampleImage:ex.url||"",exampleImageSource:ex.sourceUrl||"",exampleImageLicense:ex.license||"",exampleImageArtist:ex.artist||"",exampleImageQuery:(pendingVehicle?.imageQuery||vehicleLabel(pendingVehicle||{make:$("carMake").value,model:$("carModel").value,variant:$("carVariant").value}))};
+  state.cars.push(c);state.activeCarId=c.id;save();e.target.reset();pendingExampleImage=null;pendingVehicle=null;setExamplePreview(null,"Wähle ein Fahrzeug aus der Datenbank.");toast("Fahrzeug gespeichert");render();show("home")
 };
 $("serviceDate").value=today();$("fuelDate").value=today();
 
@@ -258,7 +217,7 @@ function renderHome(){
   $("statService").textContent=next?num(next.nextKm)+" km":"—";
   const cost=(c?(+c.purchase||0)+state.service.filter(x=>x.carId===c.id).reduce((a,x)=>a+(+x.cost||0),0)+state.fuel.filter(x=>x.carId===c.id).reduce((a,x)=>a+(+x.cost||0),0)+state.builds.filter(x=>x.carId===c.id).reduce((a,x)=>a+(+x.price||0),0):0);
   $("statCost").textContent=money(cost);
-  const hi=$("heroImage");hi.innerHTML=c?.image?`<img src="${c.image}" alt="">`:"<span>🚘</span>";
+  const hi=$("heroImage"),heroSrc=c&&(c.image||c.exampleImage);hi.innerHTML=heroSrc?`<img src="${heroSrc}" alt="">${!c.image&&c.exampleImage?`<a class="hero-credit" href="${c.exampleImageSource||'#'}" target="_blank" rel="noreferrer">Beispielbild · Wikimedia Commons</a>`:""}`:`<div class="hero-fallback"><b>JIGGY.</b><span>${c?esc(`${c.make} ${c.model}`):"YOUR CAR. YOUR STORY."}</span></div>`;
   let acts=[];
   state.service.filter(x=>c&&x.carId===c.id).forEach(x=>acts.push({d:x.date,t:x.type,s:money(x.cost)}));
   state.fuel.filter(x=>c&&x.carId===c.id).forEach(x=>acts.push({d:x.date,t:"Tankung",s:`${x.liters||0} l · ${money(x.cost)}`}));
@@ -332,8 +291,8 @@ function renderGallery(){
 function renderLists(){
   const c=car();
   $("carList").innerHTML=state.cars.length?state.cars.map(x=>`<div class="vehicle-card">
-    <div class="vehicle-thumb">${x.image?`<img src="${x.image}" alt="">`:"<span>🚗</span>"}</div>
-    <div class="vehicle-main"><h4>${cname(x)}</h4><p>${[x.year?`Baujahr ${x.year}`:"",`${num(x.km)} km`,x.purchase?money(x.purchase):"",x.plate].filter(Boolean).join(" · ")}</p></div>
+    <div class="vehicle-thumb">${(x.image||x.exampleImage)?`<img src="${x.image||x.exampleImage}" alt="">`:"<span>🚗</span>"}</div>
+    <div class="vehicle-main"><h4>${cname(x)}</h4><p>${[x.year?`Baujahr ${x.year}`:"",`${num(x.km)} km`,x.purchase?money(x.purchase):"",x.plate].filter(Boolean).join(" · ")}</p>${!x.image&&x.exampleImage?`<span class="example-source-badge">Beispielbild</span>`:""}</div>
     <div class="vehicle-actions">${x.id===state.activeCarId?'<span class="status good">Aktiv</span>':""}<button class="mini" onclick="activate('${x.id}')">Auswählen</button><button class="mini danger" onclick="del('cars','${x.id}')">Löschen</button></div>
   </div>`).join(""):'<div class="empty">Noch kein Fahrzeug angelegt.</div>';
 
@@ -345,11 +304,45 @@ function renderLists(){
 
   $("buildList").innerHTML=state.builds.filter(x=>c&&x.carId===c.id).map(x=>item(x.name,[x.category,money(x.price)].join(" · "),`<span class="status ${x.status==="Verbaut"?"good":""}">${x.status}</span>`,`<button class="mini danger" onclick="del('builds','${x.id}')">Löschen</button>`)).join("")||'<div class="empty">Noch keine Umbauten.</div>';
 }
-function render(){refreshSelectors();renderHome();renderExtras();renderGallery();renderLists()}
-$("exportBtn").onclick=()=>{const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="MyGarage_Backup.json";a.click();URL.revokeObjectURL(a.href)}
+function render(){refreshSelectors();renderHome();renderExtras();renderGallery();renderLists();renderStats()}
+$("exportBtn").onclick=()=>{const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="JIGGY_Backup.json";a.click();URL.revokeObjectURL(a.href)}
 $("importFile").onchange=async e=>{try{let s=JSON.parse(await e.target.files[0].text());state=Object.assign(blank(),s);save();render();show("home")}catch{alert("Backup konnte nicht gelesen werden.")}}
-$("resetBtn").onclick=()=>{if(confirm("Wirklich alle lokalen MyGarage-Daten löschen?")){state=blank();save();render();show("home")}}
+$("resetBtn").onclick=()=>{if(confirm("Wirklich alle lokalen JIGGY-Daten löschen?")){state=blank();save();render();show("home")}}
 render();
+
+
+/* JIGGY 1.5 - Statistics */
+function scopedCars(){return $("statsCarFilter")?.value==="all"?state.cars:(car()?[car()]:[])}
+function scopeIds(){return new Set(scopedCars().map(c=>c.id))}
+function scoped(type){const ids=scopeIds();return (state[type]||[]).filter(x=>ids.has(x.carId))}
+function sum(arr,key){return arr.reduce((a,x)=>a+(+x[key]||0),0)}
+function calcFuelStats(rows){
+ const sorted=[...rows].filter(x=>+x.km>0&&+x.liters>0).sort((a,b)=>(+a.km)-(+b.km));let liters=0,km=0,segments=0;
+ for(let i=1;i<sorted.length;i++){const delta=(+sorted[i].km)-(+sorted[i-1].km);if(delta>20&&delta<2000){liters+=+sorted[i].liters||0;km+=delta;segments++}}
+ return {consumption:km>0?liters/km*100:0,segments};
+}
+function renderCostBars(parts){
+ const box=$("statsCostBars");if(!box)return;const max=Math.max(...parts.map(x=>x[1]),1);
+ box.innerHTML=parts.map(([name,val])=>`<div class="stats-bar-row"><div><span>${name}</span><b>${money(val)}</b></div><div class="stats-bar-track"><i style="width:${Math.max(2,val/max*100)}%"></i></div></div>`).join("");
+}
+function drawMonthlyCosts(){
+ const canvas=$("monthlyCostChart");if(!canvas)return;const ctx=canvas.getContext("2d"),ratio=window.devicePixelRatio||1,w=Math.max(600,canvas.clientWidth||900),h=300;canvas.width=w*ratio;canvas.height=h*ratio;ctx.setTransform(ratio,0,0,ratio,0,0);
+ const now=new Date(),months=[];for(let i=11;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);months.push({key:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`,label:d.toLocaleDateString("de-DE",{month:"short"}),value:0})}
+ const map=Object.fromEntries(months.map(x=>[x.key,x]));const add=(rows,key)=>rows.forEach(x=>{const k=String(x.date||"").slice(0,7);if(map[k])map[k].value+=+x[key]||0});add(scoped("fuel"),"cost");add(scoped("service"),"cost");add(scoped("builds"),"price");
+ ctx.clearRect(0,0,w,h);const max=Math.max(...months.map(x=>x.value),1),left=46,bottom=38,top=18,right=14,cw=w-left-right,ch=h-top-bottom,gap=10,bw=(cw-gap*(months.length-1))/months.length;ctx.font="11px Arial";ctx.textAlign="center";
+ months.forEach((m,i)=>{const bh=m.value/max*(ch-20),x=left+i*(bw+gap),y=top+ch-bh;ctx.fillStyle="#2b2e34";ctx.fillRect(x,top,bw,ch);ctx.fillStyle="#e33434";ctx.fillRect(x,y,bw,bh);ctx.fillStyle="#8f949d";ctx.fillText(m.label,x+bw/2,h-14);if(m.value>0){ctx.fillStyle="#e9eaec";ctx.font="10px Arial";ctx.fillText(new Intl.NumberFormat("de-DE",{notation:"compact",maximumFractionDigits:1}).format(m.value)+" €",x+bw/2,Math.max(12,y-6));ctx.font="11px Arial"}});
+}
+function renderVehicleCompare(){
+ const box=$("vehicleCostCompare");if(!box)return;if(!state.cars.length){box.innerHTML='<div class="empty">Noch keine Fahrzeuge.</div>';return}
+ const rows=state.cars.map(c=>{const purchase=+c.purchase||0,fuel=sum(state.fuel.filter(x=>x.carId===c.id),"cost"),service=sum(state.service.filter(x=>x.carId===c.id),"cost"),builds=sum(state.builds.filter(x=>x.carId===c.id),"price");return {c,total:purchase+fuel+service+builds}}).sort((a,b)=>b.total-a.total),max=Math.max(...rows.map(x=>x.total),1);
+ box.innerHTML=rows.map(x=>`<div class="compare-row"><div class="compare-top"><strong>${esc(cname(x.c))}</strong><b>${money(x.total)}</b></div><div class="stats-bar-track"><i style="width:${Math.max(2,x.total/max*100)}%"></i></div></div>`).join("");
+}
+function renderStats(){
+ if(!$("statsTotalCost"))return;const cars=scopedCars(),fuel=scoped("fuel"),service=scoped("service"),builds=scoped("builds"),purchase=sum(cars,"purchase"),fuelCost=sum(fuel,"cost"),serviceCost=sum(service,"cost"),buildCost=sum(builds,"price"),total=purchase+fuelCost+serviceCost+buildCost,liters=sum(fuel,"liters"),fs=calcFuelStats(fuel);
+ $("statsTotalCost").textContent=money(total);$("statsTotalSub").textContent=`${cars.length} Fahrzeug${cars.length===1?"":"e"} · inkl. Kaufpreis`;$("statsFuelCost").textContent=money(fuelCost);$("statsFuelSub").textContent=`${fuel.length} Tankung${fuel.length===1?"":"en"}`;$("statsConsumption").textContent=fs.consumption?`${fs.consumption.toFixed(1).replace(".",",")} l/100 km`:"—";$("statsBuildCost").textContent=money(buildCost);$("statsBuildSub").textContent=`${builds.length} Umbau${builds.length===1?"":"ten"}`;
+ renderCostBars([["Kaufpreis",purchase],["Tanken",fuelCost],["Service",serviceCost],["Umbauten",buildCost]]);const avgLiter=liters?fuelCost/liters:0;$("statsFuelFacts").innerHTML=[["Getankte Menge",liters?`${num(liters.toFixed(1))} l`:"—"],["Ø Literpreis",avgLiter?`${avgLiter.toFixed(2).replace(".",",")} €/l`:"—"],["Verbrauchsintervalle",fs.segments],["Servicekosten",money(serviceCost)]].map(x=>`<div class="fact"><span>${x[0]}</span><strong>${x[1]}</strong></div>`).join("");drawMonthlyCosts();renderVehicleCompare();
+}
+$("statsCarFilter")?.addEventListener("change",renderStats);window.addEventListener("resize",()=>{if($("statsView")?.classList.contains("active"))drawMonthlyCosts()});
 
 async function initDesktopUpdateUI(){
   const versionEl=document.getElementById("appVersion");
@@ -394,12 +387,12 @@ async function loadShareImage(src){
   if(!src)return null;
   if(shareImgCache.has(src))return shareImgCache.get(src);
   return await new Promise(resolve=>{
-    const im=new Image();im.onload=()=>{shareImgCache.set(src,im);resolve(im)};im.onerror=()=>resolve(null);im.src=src;
+    const im=new Image();if(/^https?:/i.test(src))im.crossOrigin="anonymous";im.onload=()=>{shareImgCache.set(src,im);resolve(im)};im.onerror=()=>resolve(null);im.src=src;
   });
 }
 function findCarImage(c){
   const g=(state.gallery||[]).filter(x=>x.carId===c.id);
-  return c.image||c.photo||c.imageData||g[0]?.data||g[0]?.src||g[0]?.image||null;
+  return c.image||c.photo||c.imageData||g[0]?.data||g[0]?.src||g[0]?.image||c.exampleImage||null;
 }
 function drawCover(ctx,img,x,y,w,h){
   const ir=img.width/img.height, r=w/h;let sx=0,sy=0,sw=img.width,sh=img.height;
@@ -457,7 +450,7 @@ async function downloadShareCard(){
 }
 async function nativeShareCard(){
   const blob=await shareCardBlob();if(!blob)return;const file=new File([blob],"JIGGY-Share.png",{type:"image/png"});
-  if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({title:"MyGarage",text:"Mein Fahrzeug in JIGGY.",files:[file]});return}catch(e){if(e.name==="AbortError")return}}
+  if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({title:"JIGGY",text:"Mein Fahrzeug in JIGGY.",files:[file]});return}catch(e){if(e.name==="AbortError")return}}
   downloadShareCard();
 }
 function ensureShareButtons(){
@@ -517,3 +510,30 @@ const dashboardShareObserver=new MutationObserver(()=>ensureDashboardShareButton
 document.addEventListener("DOMContentLoaded", ()=>{
   dashboardShareObserver.observe(document.body,{childList:true,subtree:true});
 });
+
+
+async function hydrateVehicleExampleImages(){
+  if(!window.myGarageDesktop?.getVehicleImage || !state?.cars?.length) return;
+  let changed=false;
+  for(const c of state.cars){
+    if(c.image) continue;
+    const q=c.exampleImageQuery || [c.make,c.model,c.variant].filter(Boolean).join(" ");
+    if(!q) continue;
+    // Refresh old remote URLs and ensure imported/missing local cache URLs can be recreated.
+    if(!c.exampleImage || /^https?:\/\//i.test(c.exampleImage)){
+      try{
+        const r=await window.myGarageDesktop.getVehicleImage(q,0);
+        if(r?.ok){
+          c.exampleImage=r.url||"";
+          c.exampleImageSource=r.sourceUrl||c.exampleImageSource||"";
+          c.exampleImageLicense=r.license||c.exampleImageLicense||"";
+          c.exampleImageArtist=r.artist||c.exampleImageArtist||"";
+          c.exampleImageQuery=q;
+          changed=true;
+        }
+      }catch(e){console.warn("Example image refresh",e)}
+    }
+  }
+  if(changed){save();renderHome();renderLists()}
+}
+setTimeout(hydrateVehicleExampleImages,500);
