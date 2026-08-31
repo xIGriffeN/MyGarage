@@ -11,7 +11,7 @@ function createWindow() {
     minWidth: 980,
     minHeight: 650,
     backgroundColor: "#0b0c0e",
-    icon: path.join(__dirname, "app", "MyGarage.ico"),
+    icon: path.join(__dirname, "app", "JIGGY.ico"),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -46,8 +46,8 @@ autoUpdater.on("update-not-available", async () => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     await dialog.showMessageBox(mainWindow, {
       type: "info",
-      title: "MyGarage Update",
-      message: "MyGarage ist aktuell.",
+      title: "JIGGY Update",
+      message: "JIGGY ist aktuell.",
       detail: `Du verwendest bereits Version ${app.getVersion()}.`,
       buttons: ["OK"]
     });
@@ -78,8 +78,8 @@ autoUpdater.on("update-available", async (info) => {
   manualUpdateCheck = false;
   const result = await dialog.showMessageBox(mainWindow, {
     type: "info",
-    title: "MyGarage Update",
-    message: `MyGarage ${info.version} ist verfügbar.`,
+    title: "JIGGY Update",
+    message: `JIGGY ${info.version} ist verfügbar.`,
     detail: "Möchtest du das Update jetzt herunterladen?",
     buttons: ["Update herunterladen", "Später"],
     defaultId: 0,
@@ -105,8 +105,8 @@ autoUpdater.on("update-downloaded", async (info) => {
   const result = await dialog.showMessageBox(mainWindow, {
     type: "info",
     title: "Update bereit",
-    message: `MyGarage ${info.version} wurde heruntergeladen.`,
-    detail: "MyGarage kann jetzt neu gestartet und aktualisiert werden.",
+    message: `JIGGY ${info.version} wurde heruntergeladen.`,
+    detail: "JIGGY kann jetzt neu gestartet und aktualisiert werden.",
     buttons: ["Jetzt installieren", "Beim Beenden"],
     defaultId: 0
   });

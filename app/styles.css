@@ -139,3 +139,7 @@ textarea:focus{outline:none;border-color:#565c66}
 
 #dashboardShareBtn{margin-left:8px}
 @media(max-width:700px){#dashboardShareBtn{margin-left:0;margin-top:8px}}
+
+/* JIGGY 1.4 branding */
+.brand-name,.logo-text,.sidebar-brand strong{letter-spacing:-.02em}
+.brand-name::after,.logo-text::after{content:".";color:#ef3340}

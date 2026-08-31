@@ -85,3 +85,11 @@ MYGARAGE 1.3.1
 
 MYGARAGE 1.3.2
 - Fix: Leistung und Drehmoment werden auf der Share Card jetzt korrekt aus den Fahrzeugdaten übernommen.
+
+
+JIGGY 1.4.0 REBRANDING
+- Sichtbarer App-Name: JIGGY.
+- Claim: Your car. Your story.
+- Installer/Shortcut: JIGGY
+- Share Cards: JIGGY Branding
+- Technische MyGarage-IDs, GitHub-Repo und Speicherstruktur bleiben absichtlich erhalten.

@@ -445,7 +445,7 @@ async function renderShareCard(){
     ctx.fillStyle=t.sub;ctx.font="600 21px Arial";ctx.fillText(r[0].toUpperCase(),x+24,y+34);
     ctx.fillStyle=t.text;ctx.font="800 30px Arial";ctx.fillText(String(r[1]),x+24,y+75);
   });
-  if(brand){ctx.fillStyle=t.sub;ctx.font="600 22px Arial";ctx.textAlign="center";ctx.fillText("Made with MyGarage",W/2,H-45)}
+  if(brand){ctx.fillStyle=t.sub;ctx.font="600 22px Arial";ctx.textAlign="center";ctx.fillText("Made with JIGGY.",W/2,H-45)}
 }
 function openShareCard(carId){
   shareCarId=carId||state.activeCarId;const m=document.getElementById("shareModal");if(!m)return;m.classList.add("open");m.setAttribute("aria-hidden","false");renderShareCard();
@@ -453,11 +453,11 @@ function openShareCard(carId){
 function closeShareCard(){const m=document.getElementById("shareModal");m?.classList.remove("open");m?.setAttribute("aria-hidden","true")}
 async function shareCardBlob(){const c=document.getElementById("shareCanvas");return await new Promise(r=>c.toBlob(r,"image/png",1))}
 async function downloadShareCard(){
-  const blob=await shareCardBlob();if(!blob)return;const car=shareActiveCar();const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`MyGarage-${(shareCarTitle(car)||"Fahrzeug").replace(/[^a-z0-9äöüß]+/gi,"-")}.png`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+  const blob=await shareCardBlob();if(!blob)return;const car=shareActiveCar();const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`JIGGY-${(shareCarTitle(car)||"Fahrzeug").replace(/[^a-z0-9äöüß]+/gi,"-")}.png`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500);
 }
 async function nativeShareCard(){
-  const blob=await shareCardBlob();if(!blob)return;const file=new File([blob],"MyGarage-Share.png",{type:"image/png"});
-  if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({title:"MyGarage",text:"Mein Fahrzeug in MyGarage",files:[file]});return}catch(e){if(e.name==="AbortError")return}}
+  const blob=await shareCardBlob();if(!blob)return;const file=new File([blob],"JIGGY-Share.png",{type:"image/png"});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({title:"MyGarage",text:"Mein Fahrzeug in JIGGY.",files:[file]});return}catch(e){if(e.name==="AbortError")return}}
   downloadShareCard();
 }
 function ensureShareButtons(){

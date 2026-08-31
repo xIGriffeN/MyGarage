@@ -1,7 +1,7 @@
 {
   "name": "mygarage",
-  "version": "1.3.2",
-  "description": "MyGarage - Deine digitale Garage",
+  "version": "1.4.0",
+  "description": "JIGGY - Your car. Your story.",
   "main": "main.js",
   "author": "MyGarage",
   "license": "MIT",
@@ -12,7 +12,7 @@
   },
   "build": {
     "appId": "de.mygarage.app",
-    "productName": "MyGarage",
+    "productName": "JIGGY",
     "directories": {
       "output": "dist"
     },
@@ -37,7 +37,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "MyGarage",
+      "shortcutName": "JIGGY",
       "deleteAppDataOnUninstall": false
     },
     "publish": [
@@ -47,7 +47,7 @@
         "repo": "MyGarage"
       }
     ],
-    "artifactName": "MyGarage-Setup-${version}.${ext}"
+    "artifactName": "JIGGY-Setup-${version}.${ext}"
   },
   "dependencies": {
     "electron-updater": "^6.3.9"
