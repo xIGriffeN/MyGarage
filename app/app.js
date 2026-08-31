@@ -479,3 +479,41 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeShareCard()});
 const shareObserver=new MutationObserver(()=>ensureShareButtons());
 document.addEventListener("DOMContentLoaded",()=>{ensureShareButtons();const root=document.getElementById("cars")||document.body;shareObserver.observe(root,{childList:true,subtree:true})});
 window.openShareCard=openShareCard;
+
+
+/* MyGarage 1.3.1 - Share Button Fix for dashboard hero */
+function ensureDashboardShareButton(){
+  if(document.getElementById("dashboardShareBtn")) return;
+
+  // Find the "Fahrzeug verwalten" button in the current dashboard hero.
+  const buttons=[...document.querySelectorAll("button, a")];
+  const manageBtn=buttons.find(el => (el.textContent||"").trim().toLowerCase()==="fahrzeug verwalten");
+  if(!manageBtn) return;
+
+  const parent=manageBtn.parentElement;
+  if(!parent) return;
+
+  const btn=document.createElement("button");
+  btn.id="dashboardShareBtn";
+  btn.type="button";
+  btn.className="btn ghost";
+  btn.textContent="↗ Share Card";
+  btn.addEventListener("click", e=>{
+    e.preventDefault();
+    e.stopPropagation();
+    openShareCard(state.activeCarId);
+  });
+
+  parent.appendChild(btn);
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+  ensureDashboardShareButton();
+  setTimeout(ensureDashboardShareButton, 250);
+  setTimeout(ensureDashboardShareButton, 1000);
+});
+
+const dashboardShareObserver=new MutationObserver(()=>ensureDashboardShareButton());
+document.addEventListener("DOMContentLoaded", ()=>{
+  dashboardShareObserver.observe(document.body,{childList:true,subtree:true});
+});

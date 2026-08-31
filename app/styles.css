@@ -136,3 +136,6 @@ textarea:focus{outline:none;border-color:#565c66}
 .share-preview-wrap{display:flex;justify-content:center;align-items:flex-start;background:#090a0c;border-radius:16px;padding:16px;min-height:400px}
 #shareCanvas{display:block;max-width:100%;max-height:68vh;width:auto;height:auto;border-radius:10px;box-shadow:0 15px 50px rgba(0,0,0,.35)}
 @media(max-width:800px){.share-layout{grid-template-columns:1fr}.share-preview-wrap{min-height:0}}
+
+#dashboardShareBtn{margin-left:8px}
+@media(max-width:700px){#dashboardShareBtn{margin-left:0;margin-top:8px}}
