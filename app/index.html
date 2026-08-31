@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>MyGarage 1.1</title>
+  <title>MyGarage 1.2</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -92,7 +92,14 @@
           <div id="activityList" class="simple-list"></div>
         </div>
       </div>
-    </section>
+    <div class="card app-update-card">
+  <div class="card-head"><div>
+    <h3>MyGarage Update</h3>
+    <p class="muted">Installierte Version: <strong id="appVersion">1.2.0</strong></p>
+  </div></div>
+  <button class="btn" id="checkUpdatesBtn" type="button">Nach Updates suchen</button>
+  <p class="muted small" id="updateStatus">Updates werden auch automatisch beim Start geprüft.</p>
+</div></section>
 
     <section id="carsView" class="view">
       <div class="section-grid">

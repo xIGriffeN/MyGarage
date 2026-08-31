@@ -1,6 +1,6 @@
 {
   "name": "mygarage",
-  "version": "1.1.4",
+  "version": "1.2.0",
   "description": "MyGarage - Deine digitale Garage",
   "main": "main.js",
   "author": "MyGarage",
@@ -13,13 +13,13 @@
   "build": {
     "appId": "de.mygarage.app",
     "productName": "MyGarage",
-    "artifactName": "MyGarage-Setup-${version}.${ext}",
     "directories": {
       "output": "dist"
     },
     "files": [
       "main.js",
-      "app/**/*"
+      "app/**/*",
+      "preload.js"
     ],
     "win": {
       "target": [
@@ -46,7 +46,8 @@
         "owner": "xIGriffeN",
         "repo": "MyGarage"
       }
-    ]
+    ],
+    "artifactName": "MyGarage-Setup-${version}.${ext}"
   },
   "dependencies": {
     "electron-updater": "^6.3.9"

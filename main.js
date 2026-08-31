@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain } = require("electron");
 const path = require("path");
 const { autoUpdater } = require("electron-updater");
 
@@ -14,6 +14,7 @@ function createWindow() {
     icon: path.join(__dirname, "app", "MyGarage.ico"),
     autoHideMenuBar: true,
     webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true
@@ -24,6 +25,34 @@ function createWindow() {
 
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
 }
+
+let manualUpdateCheck = false;
+
+ipcMain.handle("app:get-version", () => app.getVersion());
+ipcMain.handle("app:check-for-updates", async () => {
+  manualUpdateCheck = true;
+  try {
+    await autoUpdater.checkForUpdates();
+    return { ok: true };
+  } catch (err) {
+    manualUpdateCheck = false;
+    return { ok: false, error: err.message };
+  }
+});
+
+autoUpdater.on("update-not-available", async () => {
+  if (!manualUpdateCheck) return;
+  manualUpdateCheck = false;
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    await dialog.showMessageBox(mainWindow, {
+      type: "info",
+      title: "MyGarage Update",
+      message: "MyGarage ist aktuell.",
+      detail: `Du verwendest bereits Version ${app.getVersion()}.`,
+      buttons: ["OK"]
+    });
+  }
+});
 
 app.whenReady().then(() => {
   createWindow();
@@ -46,6 +75,7 @@ autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = true;
 
 autoUpdater.on("update-available", async (info) => {
+  manualUpdateCheck = false;
   const result = await dialog.showMessageBox(mainWindow, {
     type: "info",
     title: "MyGarage Update",

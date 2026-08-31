@@ -350,3 +350,26 @@ $("exportBtn").onclick=()=>{const blob=new Blob([JSON.stringify(state,null,2)],{
 $("importFile").onchange=async e=>{try{let s=JSON.parse(await e.target.files[0].text());state=Object.assign(blank(),s);save();render();show("home")}catch{alert("Backup konnte nicht gelesen werden.")}}
 $("resetBtn").onclick=()=>{if(confirm("Wirklich alle lokalen MyGarage-Daten löschen?")){state=blank();save();render();show("home")}}
 render();
+
+async function initDesktopUpdateUI(){
+  const versionEl=document.getElementById("appVersion");
+  const btn=document.getElementById("checkUpdatesBtn");
+  const status=document.getElementById("updateStatus");
+  if(!window.myGarageDesktop){
+    if(versionEl) versionEl.textContent="Web-Version";
+    if(btn) btn.disabled=true;
+    if(status) status.textContent="Updateprüfung ist nur in der Windows-App verfügbar.";
+    return;
+  }
+  try{if(versionEl) versionEl.textContent=await window.myGarageDesktop.getVersion();}catch(e){}
+  if(btn) btn.addEventListener("click",async()=>{
+    btn.disabled=true; const old=btn.textContent; btn.textContent="Suche…";
+    if(status) status.textContent="Suche nach einer neuen Version…";
+    try{
+      const r=await window.myGarageDesktop.checkForUpdates();
+      if(!r?.ok && status) status.textContent="Updateprüfung fehlgeschlagen: "+(r?.error||"Unbekannter Fehler");
+    }catch(e){if(status) status.textContent="Updateprüfung fehlgeschlagen.";}
+    setTimeout(()=>{btn.disabled=false;btn.textContent=old;},1200);
+  });
+}
+document.addEventListener("DOMContentLoaded",initDesktopUpdateUI);

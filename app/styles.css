@@ -117,3 +117,5 @@ textarea:focus{outline:none;border-color:#565c66}
   place-items:center;
   line-height:1;
 }
+
+.app-update-card{margin-top:18px}.app-update-card .small{font-size:.86rem;margin-top:10px}#checkUpdatesBtn[disabled]{opacity:.65;cursor:wait}
