@@ -30,7 +30,7 @@
           ]
         }
       ],
-      "icon": "app/MyGarage.ico"
+      "icon": "app/JIGGY.ico"
     },
     "nsis": {
       "oneClick": false,

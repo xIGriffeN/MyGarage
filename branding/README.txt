@@ -11,3 +11,8 @@ This protects existing user data and the updater migration path.
 The included concept board is a visual reference. Existing Windows icon files are
 left technically compatible for this release; dedicated production icon assets
 can be swapped in next without changing storage or repo identity.
+
+Production icon added:
+- app/JIGGY.png
+- app/JIGGY.ico
+- Windows installer/build now uses app/JIGGY.ico

@@ -11,7 +11,7 @@ function createWindow() {
     minWidth: 980,
     minHeight: 650,
     backgroundColor: "#0b0c0e",
-    icon: path.join(__dirname, "app", "JIGGY.ico"),
+    icon: path.join(__dirname, "app", "JIGGY.png"),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
