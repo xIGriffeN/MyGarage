@@ -26,6 +26,8 @@ jobs:
         run: npm ci
 
       - name: Windows Setup bauen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run dist
 
       - name: Dateien zum GitHub Release hochladen
