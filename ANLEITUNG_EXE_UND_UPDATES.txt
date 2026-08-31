@@ -81,3 +81,7 @@ MYGARAGE 1.3.0
 
 MYGARAGE 1.3.1
 - Fix: Share-Card-Button erscheint jetzt auf der Übersicht direkt neben "Fahrzeug verwalten" und "Service eintragen".
+
+
+MYGARAGE 1.3.2
+- Fix: Leistung und Drehmoment werden auf der Share Card jetzt korrekt aus den Fahrzeugdaten übernommen.

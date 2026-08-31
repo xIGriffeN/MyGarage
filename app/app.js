@@ -434,7 +434,7 @@ async function renderShareCard(){
   ctx.fillStyle=t.accent;ctx.fillRect(pad,infoY+18,90,6);
   infoY+=75;
   const rows=[
-    ["Baujahr",c.year||"—"],["Leistung",c.ps?`${c.ps} PS`:"—"],["Drehmoment",c.nm?`${c.nm} Nm`:"—"],
+    ["Baujahr",c.year||"—"],["Leistung",c.power?`${c.power} PS`:"—"],["Drehmoment",c.torque?`${c.torque} Nm`:"—"],
     ["Kraftstoff",c.fuel||"—"],["Getriebe",c.gearbox||"—"]
   ];
   if(purchase)rows.push(["Kaufpreis",shareMoney(c.purchase)]);
