@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>MyGarage 1.1</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-mark">MG</div>
+      <div class="brand-copy"><strong>MyGarage</strong><span>Deine digitale Garage</span></div>
+    </div>
+
+    <button class="nav active" data-view="home"><span>⌂</span><b>Übersicht</b></button>
+    <button class="nav" data-view="cars"><span>🚗</span><b>Fahrzeuge</b></button>
+    <button class="nav" data-view="service"><span>🧰</span><b>Service</b></button>
+    <button class="nav" data-view="legal"><span>📄</span><b>TÜV & ABE</b></button>
+    <button class="nav" data-view="fuel"><span>⛽</span><b>Tankbuch</b></button>
+    <button class="nav" data-view="build"><span>🔧</span><b>Umbauten</b></button>
+    <button class="nav" data-view="logbook"><span>📸</span><b>Logbuch</b></button>
+    <button class="nav" data-view="more"><span>•••</span><b>Mehr</b></button>
+  </aside>
+
+  <button class="mobile-menu" id="mobileMenu">☰</button>
+
+  <main class="app">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">MYGARAGE</div>
+        <h1 id="pageTitle">Übersicht</h1><p class="page-sub" id="pageSub">Alles Wichtige zu deinem Fahrzeug auf einen Blick.</p>
+      </div>
+      <select id="globalCar"></select>
+    </header>
+
+    <section id="homeView" class="view active">
+      <div class="hero card">
+        <div class="hero-copy">
+          <span class="pill">Aktives Fahrzeug</span>
+          <h2 id="homeCarName">Noch kein Fahrzeug</h2>
+          <p id="homeCarInfo">Lege dein erstes Fahrzeug an.</p>
+          <div class="hero-actions">
+            <button class="primary" data-go="cars">Fahrzeug verwalten</button>
+            <button class="secondary" data-go="service">Service eintragen</button>
+          </div>
+        </div>
+        <div class="hero-image" id="heroImage"><span>🚘</span></div>
+      </div>
+
+      <div class="stats">
+        <div class="stat card"><span>Kilometer</span><strong id="statKm">—</strong></div>
+        <div class="stat card"><span>Leistung</span><strong id="statPower">—</strong></div>
+        <div class="stat card"><span>Nächster Service</span><strong id="statService">—</strong></div>
+        <div class="stat card"><span>Gesamtkosten</span><strong id="statCost">0 €</strong></div>
+      </div>
+
+      <div class="grid2 dashboard-extra">
+        <div class="card status-card">
+          <div class="card-head"><h3>Fahrzeugstatus</h3><span id="statusCount">Alles im Blick</span></div>
+          <div id="vehicleStatus" class="vehicle-status"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Nächster Umbau</h3><span id="nextBuildStatus">—</span></div>
+          <div id="nextBuildCard" class="next-build"></div>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <div class="card-head"><h3>Kosten</h3><span>Aktives Fahrzeug</span></div>
+          <div id="costBreakdown" class="cost-breakdown"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Erinnerungen</h3><span>Automatisch</span></div>
+          <div id="reminderList" class="simple-list"></div>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <div class="card-head"><h3>Schnellzugriff</h3></div>
+          <div class="quick-grid">
+            <button data-go="fuel">⛽<span>Tankung</span></button>
+            <button data-go="service">🧰<span>Service</span></button>
+            <button data-go="legal">📄<span>TÜV / ABE</span></button>
+            <button data-go="build">🔧<span>Umbau</span></button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Letzte Aktivitäten</h3></div>
+          <div id="activityList" class="simple-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="carsView" class="view">
+      <div class="section-grid">
+        <div class="card">
+          <div class="card-head"><h3>Fahrzeug hinzufügen</h3><span>Nur das Wichtigste</span></div>
+          <form id="carForm" autocomplete="off">
+            <div class="smart-search-wrap">
+              <label>Fahrzeug suchen
+                <input id="vehicleSearch" placeholder="z. B. Audi S4, BMW M3, Golf 8 GTI ...">
+              </label>
+              <div id="vehicleSuggestions" class="suggestions"></div>
+              <small class="form-hint">Tipp: Einfach Marke oder Modell tippen. Technische Daten werden automatisch übernommen.</small>
+            </div>
+            <div class="two">
+              <label>Marke<input id="carMake" required placeholder="Audi"></label>
+              <label>Modell<input id="carModel" required placeholder="S4 Avant"></label>
+            </div>
+            <label>Variante / Motor<input id="carVariant" placeholder="z. B. 3.0 TDI quattro"></label>
+            <div class="two">
+              <label>Baujahr<input id="carYear" type="number" min="1950" max="2035"></label>
+              <label>Kilometer<input id="carKm" type="number" min="0"></label>
+            </div>
+            <div class="two">
+              <label>PS<input id="carPower" type="number" min="0"></label>
+              <label>Nm<input id="carTorque" type="number" min="0"></label>
+            </div>
+            <div class="two">
+              <label>Kraftstoff<input id="carFuel" placeholder="Diesel"></label>
+              <label>Getriebe<input id="carGearbox" placeholder="Tiptronic"></label>
+            </div>
+            <div class="two">
+              <label>Kaufpreis €<input id="carPurchase" type="number" min="0" step="100" placeholder="0"></label>
+              <label>Kennzeichen<input id="carPlate" placeholder="WES AB 123"></label>
+            </div>
+            <label>Fahrzeugbild<input id="carImage" type="file" accept="image/*"></label>
+            <button class="primary" type="submit">Fahrzeug speichern</button>
+          </form>
+        </div>
+        <div>
+        <div class="card">
+          <div class="card-head"><h3>Meine Fahrzeuge</h3></div>
+          <div id="carList" class="simple-list"></div>
+        </div>
+        <div class="card gallery-small">
+          <div class="card-head"><h3>Fahrzeugbilder</h3><span>Max. 5 Bilder</span></div>
+          <label class="photo-add">Bild hinzufügen<input id="galleryInput" type="file" accept="image/*"></label>
+          <div id="miniGallery" class="mini-gallery"></div>
+        </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="serviceView" class="view">
+      <div class="section-grid">
+        <div class="card">
+          <div class="card-head"><h3>Service eintragen</h3><span>Fahrzeug auswählen und speichern</span></div>
+          <form id="serviceForm">
+            <label>Fahrzeug<select id="serviceCar"></select></label>
+            <label>Was wurde gemacht?<select id="serviceType">
+              <option>Ölwechsel</option><option>Inspektion</option><option>Bremsen</option>
+              <option>Bremsflüssigkeit</option><option>Getriebeöl</option><option>HU/AU</option><option>Sonstiges</option>
+            </select></label>
+            <div class="two"><label>Datum<input id="serviceDate" type="date"></label><label>Kilometer<input id="serviceKm" type="number" min="0"></label></div>
+            <div class="two"><label>Kosten €<input id="serviceCost" type="number" min="0" step="0.01"></label><label>Nächster Service bei km<input id="serviceNextKm" type="number" min="0"></label></div>
+            <label>Notiz<input id="serviceNote" placeholder="Optional"></label>
+            <button class="primary" type="submit">Service speichern</button>
+          </form>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Service-Verlauf</h3></div>
+          <div id="serviceList" class="simple-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="legalView" class="view">
+      <div class="section-grid">
+        <div class="card">
+          <div class="card-head"><h3>TÜV / ABE eintragen</h3><span>Einfacher Status statt Papierchaos</span></div>
+          <form id="legalForm">
+            <label>Fahrzeug<select id="legalCar"></select></label>
+            <label>Teil / Umbau<input id="legalPart" required placeholder="z. B. Felgen 20 Zoll"></label>
+            <label>Status<select id="legalStatus">
+              <option>Serie</option><option>ABE vorhanden</option><option>ECE</option><option>Eingetragen</option>
+              <option>Eintragung nötig</option><option>Teilegutachten</option><option>Unbekannt</option>
+            </select></label>
+            <label>Nummer / Hinweis<input id="legalNumber" placeholder="Optional"></label>
+            <button class="primary" type="submit">Eintrag speichern</button>
+          </form>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Übersicht</h3></div>
+          <div id="legalList" class="simple-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="fuelView" class="view">
+      <div class="section-grid">
+        <div class="card">
+          <div class="card-head"><h3>Tankung eintragen</h3></div>
+          <form id="fuelForm">
+            <label>Fahrzeug<select id="fuelCar"></select></label>
+            <div class="two"><label>Datum<input id="fuelDate" type="date"></label><label>Kilometer<input id="fuelKm" type="number" min="0"></label></div>
+            <div class="two"><label>Liter<input id="fuelLiters" type="number" min="0" step="0.01"></label><label>Gesamtpreis €<input id="fuelCost" type="number" min="0" step="0.01"></label></div>
+            <button class="primary" type="submit">Tankung speichern</button>
+          </form>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Tankverlauf</h3></div>
+          <div id="fuelList" class="simple-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="buildView" class="view">
+      <div class="section-grid">
+        <div class="card">
+          <div class="card-head"><h3>Umbau planen</h3></div>
+          <form id="buildForm">
+            <label>Fahrzeug<select id="buildCar"></select></label>
+            <label>Umbau<input id="buildName" required placeholder="z. B. Fahrwerk"></label>
+            <div class="two"><label>Preis €<input id="buildPrice" type="number" min="0"></label><label>Bereits gespart €<input id="buildSaved" type="number" min="0" value="0"></label></div><label>Kategorie<select id="buildCategory"><option>Performance</option><option>Optik</option><option>Fahrwerk</option><option>Sound</option><option>Innenraum</option></select></label>
+            <label>Status<select id="buildStatus"><option>Geplant</option><option>Bestellt</option><option>Verbaut</option></select></label>
+            <button class="primary" type="submit">Umbau speichern</button>
+          </form>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Umbauten</h3></div>
+          <div id="buildList" class="simple-list"></div>
+        </div>
+      </div>
+    </section>
+
+    
+    <section id="logbookView" class="view">
+      <div class="section-grid logbook-grid">
+        <div class="card">
+          <h3>Foto & Video Logbuch</h3>
+          <p class="muted">Halte Umbauten, Reparaturen und Veränderungen als Chronik fest.</p>
+          <form id="logForm">
+            <label>Fahrzeug<select id="logCar"></select></label>
+            <div class="two">
+              <label>Datum<input id="logDate" type="date"></label>
+              <label>Kategorie<select id="logCategory">
+                <option>Umbau</option><option>Reparatur</option><option>Pflege</option>
+                <option>Service</option><option>Treffen / Event</option><option>Sonstiges</option>
+              </select></label>
+            </div>
+            <label>Titel<input id="logTitle" required placeholder="z. B. Carbon Mittelkonsole eingebaut"></label>
+            <label>Beschreibung<textarea id="logText" rows="4" placeholder="Was wurde gemacht? Teile, Probleme, Eindruck ..."></textarea></label>
+            <label>Bilder & Videos<input id="logMedia" type="file" accept="image/*,video/*" multiple></label>
+            <small class="form-hint">Nur lokal auf diesem PC. Max. 12 Dateien pro Eintrag, je Datei max. 250 MB.</small>
+            <button class="primary" type="submit">Logbuch-Eintrag speichern</button>
+          </form>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <div><h3>Chronik</h3><p class="muted">Deine Veränderungen in zeitlicher Reihenfolge.</p></div>
+            <select id="logFilterCar" class="compact-select"></select>
+          </div>
+          <div id="logTimeline" class="log-timeline"></div>
+        </div>
+      </div>
+    </section>
+
+<section id="moreView" class="view">
+      <div class="card">
+        <div class="card-head"><h3>Mehr</h3><span>Selten benötigte Funktionen</span></div>
+        <div class="more-grid">
+          <button id="exportBtn">Backup exportieren</button>
+          <label class="file-button">Backup importieren<input id="importFile" type="file" accept="application/json"></label>
+          <button id="resetBtn" class="danger">Alle Daten löschen</button>
+        </div>
+      </div>
+    </section>
+  </main><div id="toastHost" class="toast-host"></div>
+
+<script src="app.js"></script>
+
+<div id="mediaLightbox" class="media-lightbox" aria-hidden="true">
+  <button id="mediaClose" class="media-close" type="button" onclick="closeMedia(); return false;" aria-label="Schließen">×</button>
+  <div id="mediaStage" class="media-stage"></div>
+</div>
+</body>
+</html>

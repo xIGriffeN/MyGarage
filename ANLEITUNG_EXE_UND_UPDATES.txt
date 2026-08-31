@@ -1,0 +1,70 @@
+MYGARAGE 1.1 - ECHTE WINDOWS EXE + UPDATE SYSTEM
+
+WAS IST NEU?
+- MyGarage läuft als echte Electron Desktop-App.
+- Kein Chrome-App-Modus mehr nötig.
+- electron-builder erzeugt "MyGarage Setup.exe".
+- Desktop- und Startmenü-Verknüpfungen über den Installer.
+- Jeder Windows-Benutzer hat automatisch seinen eigenen lokalen App-Speicher.
+- Updates können automatisch über GitHub Releases erkannt werden.
+- Die App fragt vor dem Download eines Updates.
+- Nach dem Download kann das Update direkt installiert werden.
+
+WICHTIG ZUM LOKALEN SPEICHER
+Die App selbst enthält KEINE Nutzerdaten.
+Fahrzeuge, Tankungen, Umbauten, Bilder und Videos werden auf dem jeweiligen PC gespeichert.
+Wenn du die Setup.exe an einen Freund gibst, sieht er deine Daten NICHT.
+
+EXE AUF DEINEM WINDOWS-PC BAUEN
+1. Node.js LTS installieren.
+2. Diesen Ordner entpacken.
+3. BUILD_WINDOWS_EXE.cmd starten.
+4. Danach liegt MyGarage Setup.exe im Ordner "dist".
+
+AUTOMATISCHE BUILDS + UPDATES ÜBER GITHUB
+1. Erstelle auf GitHub ein Repository namens "MyGarage".
+2. Öffne package.json.
+3. Ersetze bei "publish":
+       xIGriffeN
+   durch deinen GitHub-Benutzernamen.
+4. Lade den kompletten Inhalt dieses Ordners ins Repository.
+5. Commit + Push.
+6. Erstelle einen Git-Tag, z. B.:
+       v1.1.0
+7. GitHub Actions baut automatisch die Windows Setup.exe
+   und veröffentlicht die Update-Dateien als GitHub Release.
+
+FÜR DAS NÄCHSTE UPDATE
+1. In package.json die Version erhöhen, z. B.:
+       "version": "1.2.0"
+2. Änderungen an MyGarage machen.
+3. Commit + Push.
+4. Tag "v1.2.0" erstellen und pushen.
+5. GitHub baut und veröffentlicht die neue Version.
+6. Installierte MyGarage-Apps erkennen Version 1.2.0 automatisch.
+
+WARUM GITHUB RELEASES?
+Die App braucht einen Ort im Internet, von dem sie feststellen kann:
+- welche Version aktuell ist
+- wo die neue Setup-Datei liegt
+- welche Update-Metadaten dazugehören
+
+GitHub Releases erledigt genau das.
+
+DATENSCHUTZ
+Es werden über das Update-System keine Fahrzeugdaten hochgeladen.
+Der Update-Check fragt lediglich GitHub nach der aktuellen Programmversion.
+
+HINWEIS ZUR AKTUELLEN CHROME-VERSION
+Die bisherige Chrome-App und die neue Electron-App verwenden technisch unterschiedliche
+Browser-/App-Datenverzeichnisse. Ein automatischer Import des alten Chrome-Profils ist
+in diesem Paket noch nicht enthalten.
+Vor dem Umstieg solltest du deshalb in MyGarage den JSON-Backup-Export verwenden.
+Danach kannst du das Backup in der neuen App wieder importieren.
+
+
+DEIN GITHUB-ZIEL IST BEREITS EINGETRAGEN:
+GitHub-Benutzer: xIGriffeN
+Repository: MyGarage
+
+Du musst in package.json dafür nichts mehr ändern.
