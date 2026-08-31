@@ -80,7 +80,7 @@ function closeMedia(){$("mediaLightbox")?.classList.remove("open");$("mediaLight
 window.closeMedia=closeMedia;
 async function deleteLog(id){const x=(state.logs||[]).find(v=>v.id===id);if(!x||!confirm("Diesen Logbuch-Eintrag wirklich löschen?"))return;for(const m of x.media||[]){try{await mediaDelete(m.id)}catch{}}state.logs=state.logs.filter(v=>v.id!==id);save();toast("Logbuch-Eintrag gelöscht","warn");renderLogbook()}
 
-function blank(){return{cars:[],service:[],legal:[],fuel:[],builds:[],gallery:[],logs:[],activeCarId:null}}
+function blank(){return{cars:[],service:[],legal:[],fuel:[],builds:[],gallery:[],logs:[],documents:[],reminders:[],activeCarId:null}}
 function load(){
   try{
     let raw=localStorage.getItem(KEY)
@@ -100,7 +100,7 @@ function load(){
     s.service=old.service||old.services||[];
     s.legal=old.legal||[];
     s.fuel=old.fuel||[];
-    s.builds=old.builds||[];s.gallery=old.gallery||[];s.logs=old.logs||[];
+    s.builds=old.builds||[];s.gallery=old.gallery||[];s.logs=old.logs||[];s.documents=old.documents||[];s.reminders=old.reminders||[];
     s.activeCarId=old.activeCarId||s.cars[0]?.id||null;
     return s
   }catch{return blank()}
@@ -110,26 +110,72 @@ function save(){localStorage.setItem(KEY,JSON.stringify(state))}
 function car(id=state.activeCarId){return state.cars.find(c=>c.id===id)||state.cars[0]||null}
 function cname(c){return c?[c.make,c.model,c.variant].filter(Boolean).join(" "):"Kein Fahrzeug"}
 function setActive(id){if(!id)return;state.activeCarId=id;save();render()}
+
+/* ===== JIGGY 1.7.4 — WORKING SIDEBAR SUBMENUS ===== */
+function setSubmenuOpen(id, open){
+  const menu = document.getElementById(id);
+  const toggle = document.querySelector(`.nav-toggle[data-submenu="${id}"]`);
+  if(!menu || !toggle) return;
+  menu.classList.toggle("open", !!open);
+  toggle.classList.toggle("open", !!open);
+  toggle.setAttribute("aria-expanded", open ? "true" : "false");
+  toggle.closest(".nav-parent-row")?.classList.toggle("open", !!open);
+}
+
+function toggleSubmenu(id){
+  const menu = document.getElementById(id);
+  if(!menu) return;
+  setSubmenuOpen(id, !menu.classList.contains("open"));
+}
+
+function syncSidebarGroups(view){
+  const serviceActive = view === "service" || view === "reminders";
+  const legalActive = view === "legal" || view === "vault";
+
+  // If one of the submenu pages is active, keep that group open.
+  if(view === "reminders") setSubmenuOpen("serviceSubmenu", true);
+  if(view === "vault") setSubmenuOpen("legalSubmenu", true);
+
+  document.querySelector('.nav-toggle[data-submenu="serviceSubmenu"]')
+    ?.closest(".nav-parent-row")?.classList.toggle("active-parent", serviceActive);
+
+  document.querySelector('.nav-toggle[data-submenu="legalSubmenu"]')
+    ?.closest(".nav-parent-row")?.classList.toggle("active-parent", legalActive);
+}
+
+document.querySelectorAll(".nav-toggle[data-submenu]").forEach(toggle => {
+  toggle.setAttribute("aria-expanded", "false");
+  toggle.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleSubmenu(toggle.dataset.submenu);
+  });
+});
+
 function show(view){
   document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
   document.querySelectorAll(".nav").forEach(v=>v.classList.remove("active"));
   $(view+"View")?.classList.add("active");
   document.querySelector(`.nav[data-view="${view}"]`)?.classList.add("active");
-  const titles={home:"Übersicht",cars:"Fahrzeuge",service:"Service",legal:"TÜV & ABE",fuel:"Tankbuch",build:"Umbauten",logbook:"Logbuch",stats:"Statistiken",more:"Mehr"};
-  const subs={home:"Alles Wichtige zu deinem Fahrzeug auf einen Blick.",cars:"Fahrzeuge hinzufügen, auswählen und verwalten.",service:"Wartung und nächste Termine übersichtlich festhalten.",legal:"ABE, Eintragungen und TÜV-Themen einfach dokumentieren.",fuel:"Tankungen und Kraftstoffkosten im Blick behalten.",build:"Geplante und verbaute Umbauten verwalten.",logbook:"Deine Umbauten und Veränderungen als Foto- und Video-Chronik.",stats:"Kosten, Verbrauch und Entwicklung deiner Garage.",more:"Backup und selten benötigte Funktionen."};
+  const titles={home:"Übersicht",cars:"Fahrzeuge",service:"Service",legal:"TÜV & ABE",fuel:"Tankbuch",build:"Umbauten",logbook:"Logbuch",stats:"Statistiken",vault:"Dokumente",reminders:"Erinnerungen",profile:"Public Profile",more:"Mehr"};
+  const subs={home:"Alles Wichtige zu deinem Fahrzeug auf einen Blick.",cars:"Fahrzeuge hinzufügen, auswählen und verwalten.",service:"Wartung und nächste Termine übersichtlich festhalten.",legal:"ABE, Eintragungen und TÜV-Themen einfach dokumentieren.",fuel:"Tankungen und Kraftstoffkosten im Blick behalten.",build:"Geplante und verbaute Umbauten verwalten.",logbook:"Deine Umbauten und Veränderungen als Foto- und Video-Chronik.",stats:"Kosten, Verbrauch und Entwicklung deiner Garage.",vault:"Rechnungen, ABEs und Fahrzeugunterlagen lokal archivieren.",reminders:"Termine und Kilometer-Intervalle nie mehr verpassen.",profile:"Ein öffentliches Fahrzeugprofil mit eigenem Share-Link.",more:"Backup und selten benötigte Funktionen."};
   $("pageTitle").textContent=titles[view]||"MyGarage"; $("pageSub").textContent=subs[view]||"";
   $("sidebar").classList.remove("open");
   refreshSelectors();
   renderLogbook();
   renderLists();
   renderStats();
+  renderVault();
+  renderReminderManager();
+  renderPublicProfile();
+  syncSidebarGroups(view);
 }
-document.querySelectorAll(".nav").forEach(b=>b.onclick=()=>show(b.dataset.view));
+document.querySelectorAll(".nav[data-view]").forEach(b=>b.onclick=()=>show(b.dataset.view));
 document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>show(b.dataset.go));
 $("mobileMenu").onclick=()=>$("sidebar").classList.toggle("open");
 
 function refreshSelectors(){
-  const ids=["globalCar","serviceCar","legalCar","fuelCar","buildCar","logCar","logFilterCar"];
+  const ids=["globalCar","serviceCar","legalCar","fuelCar","buildCar","logCar","logFilterCar","vaultCar","vaultFilter","reminderCar","reminderFilter","profileCar"];
   ids.forEach(id=>{
     const el=$(id);if(!el)return;
     const old=el.value;el.innerHTML="";
@@ -219,14 +265,32 @@ async function fileData(file){
   return new Promise((res,rej)=>{let r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file)})
 }
 
+let editingCarId=null;
+function resetCarEditor(){
+  editingCarId=null;$("carForm")?.reset();pendingExampleImage=null;pendingVehicle=null;pendingVinData=null;renderVinFacts(null);
+  if($("vinDecodeStatus"))$("vinDecodeStatus").textContent="Noch keine VIN geprüft.";setExamplePreview(null,"Wähle ein Fahrzeug aus der Datenbank.");
+  if($("carFormTitle"))$("carFormTitle").textContent="Fahrzeug hinzufügen";if($("carSubmitBtn"))$("carSubmitBtn").textContent="Fahrzeug speichern";if($("cancelCarEdit"))$("cancelCarEdit").hidden=true;
+}
+window.editCar=id=>{
+  const c=car(id);if(!c)return;editingCarId=id;state.activeCarId=id;
+  $("carVin").value=c.vin||"";$("carMake").value=c.make||"";$("carModel").value=c.model||"";$("carVariant").value=c.variant||"";$("carYear").value=c.year||"";$("carKm").value=c.km||"";$("carPower").value=c.power||"";$("carTorque").value=c.torque||"";$("carFuel").value=c.fuel||"";$("carGearbox").value=c.gearbox||"";$("carPurchase").value=c.purchase||"";$("carPlate").value=c.plate||"";
+  pendingVinData=c.vinData||null;renderVinFacts(pendingVinData);pendingExampleImage=c.exampleImage?{url:c.exampleImage,sourceUrl:c.exampleImageSource||"",license:c.exampleImageLicense||"",artist:c.exampleImageArtist||""}:null;
+  setExamplePreview(pendingExampleImage,c.exampleImage?"Gespeichertes Beispielbild":"Kein Beispielbild gespeichert.");
+  if($("carFormTitle"))$("carFormTitle").textContent="Fahrzeug bearbeiten";if($("carSubmitBtn"))$("carSubmitBtn").textContent="Änderungen speichern";if($("cancelCarEdit"))$("cancelCarEdit").hidden=false;
+  show("cars");document.querySelector("#carsView")?.scrollIntoView({behavior:"smooth",block:"start"});
+};
+$("cancelCarEdit")?.addEventListener("click",resetCarEditor);
+
 $("carForm").onsubmit=async e=>{
   e.preventDefault();
-  let image="";try{image=await fileData($("carImage").files[0])}catch{return alert("Bild bitte kleiner als 3 MB wählen.")}
+  const oldCar=editingCarId?car(editingCarId):null;
+  let image=oldCar?.image||"";const selected=$("carImage").files[0];if(selected){try{image=await fileData(selected)}catch{return alert("Bild bitte kleiner als 3 MB wählen.")}}
   const ex=pendingExampleImage||{};
-  const c={id:uid(),vin:normalizeVin($("carVin")?.value),vinData:pendingVinData||null,make:$("carMake").value.trim(),model:$("carModel").value.trim(),variant:$("carVariant").value.trim(),year:+$("carYear").value||0,km:+$("carKm").value||0,power:+$("carPower").value||0,torque:+$("carTorque").value||0,fuel:$("carFuel").value.trim(),gearbox:$("carGearbox").value.trim(),purchase:+$("carPurchase").value||0,plate:$("carPlate").value.trim(),image,exampleImage:ex.url||"",exampleImageSource:ex.sourceUrl||"",exampleImageLicense:ex.license||"",exampleImageArtist:ex.artist||"",exampleImageQuery:(pendingVehicle?.imageQuery||vehicleLabel(pendingVehicle||{make:$("carMake").value,model:$("carModel").value,variant:$("carVariant").value}))};
-  state.cars.push(c);state.activeCarId=c.id;save();e.target.reset();pendingExampleImage=null;pendingVehicle=null;pendingVinData=null;renderVinFacts(null);$("vinDecodeStatus").textContent="Noch keine VIN geprüft.";setExamplePreview(null,"Wähle ein Fahrzeug aus der Datenbank.");toast("Fahrzeug gespeichert");render();show("home")
+  const c={id:oldCar?.id||uid(),vin:normalizeVin($("carVin")?.value),vinData:pendingVinData||oldCar?.vinData||null,make:$("carMake").value.trim(),model:$("carModel").value.trim(),variant:$("carVariant").value.trim(),year:+$("carYear").value||0,km:+$("carKm").value||0,power:+$("carPower").value||0,torque:+$("carTorque").value||0,fuel:$("carFuel").value.trim(),gearbox:$("carGearbox").value.trim(),purchase:+$("carPurchase").value||0,plate:$("carPlate").value.trim(),image,exampleImage:ex.url||oldCar?.exampleImage||"",exampleImageSource:ex.sourceUrl||oldCar?.exampleImageSource||"",exampleImageLicense:ex.license||oldCar?.exampleImageLicense||"",exampleImageArtist:ex.artist||oldCar?.exampleImageArtist||"",exampleImageQuery:(pendingVehicle?.imageQuery||oldCar?.exampleImageQuery||vehicleLabel(pendingVehicle||{make:$("carMake").value,model:$("carModel").value,variant:$("carVariant").value}))};
+  if(oldCar){const i=state.cars.findIndex(x=>x.id===oldCar.id);state.cars[i]=c}else state.cars.push(c);
+  state.activeCarId=c.id;save();const wasEdit=!!oldCar;resetCarEditor();toast(wasEdit?"Fahrzeug aktualisiert":"Fahrzeug gespeichert");render();if(!wasEdit)show("home")
 };
-$("serviceDate").value=today();$("fuelDate").value=today();
+$("serviceDate").value=today();$("fuelDate").value=today();$("legalDate").value=today();
 
 $("serviceForm").onsubmit=e=>{
   e.preventDefault();if(!state.cars.length)return alert("Bitte zuerst ein Fahrzeug anlegen.");
@@ -235,21 +299,63 @@ $("serviceForm").onsubmit=e=>{
   let c=car(id);if(c&&+$("serviceKm").value>+c.km)c.km=+$("serviceKm").value;
   save();e.target.reset();$("serviceDate").value=today();toast("Service gespeichert");render()
 };
+function syncLegalType(){const hu=$("legalType")?.value==="HU";if($("huFields"))$("huFields").hidden=!hu;if($("abeFields"))$("abeFields").hidden=hu}
+$("legalType")?.addEventListener("change",syncLegalType);syncLegalType();
 $("legalForm").onsubmit=e=>{
   e.preventDefault();if(!state.cars.length)return alert("Bitte zuerst ein Fahrzeug anlegen.");
-  state.legal.push({id:uid(),carId:$("legalCar").value,part:$("legalPart").value.trim(),status:$("legalStatus").value,number:$("legalNumber").value.trim()});
-  save();e.target.reset();toast("TÜV / ABE gespeichert");render()
+  const type=$("legalType")?.value||"ABE",carId=$("legalCar").value;
+  if(type==="HU"){
+    const km=+$("legalKm").value||0;
+    state.legal.push({id:uid(),carId,type:"HU",part:"TÜV / HU",date:$("legalDate").value||today(),km,result:$("legalHuResult").value,nextDate:$("legalNextDate").value,number:$("legalNumber").value.trim(),status:$("legalHuResult").value});
+    const c=car(carId);if(c&&km>+c.km)c.km=km;
+  }else{
+    const part=$("legalPart").value.trim();if(!part)return toast("Bitte Teil / Umbau eintragen","warn");
+    state.legal.push({id:uid(),carId,type:"ABE",part,status:$("legalStatus").value,number:$("legalNumber").value.trim()});
+  }
+  save();e.target.reset();$("legalDate").value=today();syncLegalType();toast(type==="HU"?"TÜV / HU gespeichert":"ABE / Eintragung gespeichert");render()
 };
-$("fuelForm").onsubmit=e=>{
+$("fuelForm").onsubmit=async e=>{
   e.preventDefault();if(!state.cars.length)return alert("Bitte zuerst ein Fahrzeug anlegen.");
-  const id=$("fuelCar").value,km=+$("fuelKm").value||0;
-  state.fuel.push({id:uid(),carId:id,date:$("fuelDate").value,km,liters:+$("fuelLiters").value||0,cost:+$("fuelCost").value||0});
-  let c=car(id);if(c&&km>+c.km)c.km=km;save();e.target.reset();$("fuelDate").value=today();toast("Tankung gespeichert");render()
+  const id=$("fuelCar").value,km=+$("fuelKm").value||0,file=$("fuelReceipt")?.files?.[0];let receipt=null;
+  if(file){if(file.size>15*1024*1024)return toast("Tankbeleg ist größer als 15 MB","warn");try{receipt=await vaultPut(file)}catch(err){console.error(err);return toast("Tankbeleg konnte nicht gespeichert werden","warn")}}
+  state.fuel.push({id:uid(),carId:id,date:$("fuelDate").value,km,liters:+$("fuelLiters").value||0,cost:+$("fuelCost").value||0,receiptFileId:receipt?.id||"",receiptFileName:receipt?.name||"",receiptFileType:receipt?.type||"",receiptFileSize:receipt?.size||0});
+  let c=car(id);if(c&&km>+c.km)c.km=km;save();e.target.reset();$("fuelDate").value=today();toast(receipt?"Tankung + Beleg gespeichert":"Tankung gespeichert");render()
 };
+let editingBuildId=null;
+function resetBuildForm(){
+  editingBuildId=null;
+  $("buildForm")?.reset();
+  if($("buildSaved")) $("buildSaved").value=0;
+  if($("buildSubmitBtn")) $("buildSubmitBtn").textContent="Umbau speichern";
+  if($("buildCancelEdit")) $("buildCancelEdit").hidden=true;
+  if($("buildCar")&&state.activeCarId) $("buildCar").value=state.activeCarId;
+}
+window.editBuild=id=>{
+  const x=(state.builds||[]).find(v=>v.id===id);if(!x)return;
+  editingBuildId=id;
+  $("buildCar").value=x.carId||state.activeCarId||"";
+  $("buildName").value=x.name||"";
+  $("buildPrice").value=+x.price||0;
+  $("buildSaved").value=+x.saved||0;
+  $("buildCategory").value=x.category||"Performance";
+  $("buildStatus").value=x.status||"Geplant";
+  if($("buildSubmitBtn")) $("buildSubmitBtn").textContent="Änderungen speichern";
+  if($("buildCancelEdit")) $("buildCancelEdit").hidden=false;
+  $("buildForm")?.scrollIntoView({behavior:"smooth",block:"start"});
+  $("buildSaved")?.focus();
+};
+$("buildCancelEdit")?.addEventListener("click",resetBuildForm);
 $("buildForm").onsubmit=e=>{
   e.preventDefault();if(!state.cars.length)return alert("Bitte zuerst ein Fahrzeug anlegen.");
-  state.builds.push({id:uid(),carId:$("buildCar").value,name:$("buildName").value.trim(),price:+$("buildPrice").value||0,saved:+$("buildSaved").value||0,category:$("buildCategory").value,status:$("buildStatus").value,date:today()});
-  save();e.target.reset();toast("Umbau gespeichert");render()
+  const data={carId:$("buildCar").value,name:$("buildName").value.trim(),price:+$("buildPrice").value||0,saved:+$("buildSaved").value||0,category:$("buildCategory").value,status:$("buildStatus").value};
+  if(data.saved>data.price&&data.price>0)data.saved=data.price;
+  if(editingBuildId){
+    const x=state.builds.find(v=>v.id===editingBuildId);
+    if(x)Object.assign(x,data);
+    save();resetBuildForm();toast("Umbau aktualisiert");render();return;
+  }
+  state.builds.push({id:uid(),...data,date:today()});
+  save();resetBuildForm();toast("Umbau gespeichert");render()
 };
 
 
@@ -272,7 +378,10 @@ if(mediaLightbox){
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeMedia()});
 
 function item(title,sub,status,actions=""){return `<div class="item"><div class="item-main"><div class="item-title">${title}</div><div class="item-sub">${sub||""}</div></div><div class="item-actions">${status||""}${actions}</div></div>`}
-function del(type,id){state[type]=state[type].filter(x=>x.id!==id);save();render()}
+async function del(type,id){
+  const row=state[type]?.find(x=>x.id===id);if(type==="fuel"&&row?.receiptFileId){try{await vaultDeleteFile(row.receiptFileId)}catch{}}
+  state[type]=state[type].filter(x=>x.id!==id);save();render()
+}
 window.del=del;
 window.activate=id=>setActive(id);
 
@@ -283,19 +392,25 @@ function renderHome(){
   $("statKm").textContent=c?num(c.km)+" km":"—";$("statPower").textContent=c&&c.power?num(c.power)+" PS":"—";
   let next=state.service.filter(x=>c&&x.carId===c.id&&x.nextKm>+c.km).sort((a,b)=>a.nextKm-b.nextKm)[0];
   $("statService").textContent=next?num(next.nextKm)+" km":"—";
-  const cost=(c?(+c.purchase||0)+state.service.filter(x=>x.carId===c.id).reduce((a,x)=>a+(+x.cost||0),0)+state.fuel.filter(x=>x.carId===c.id).reduce((a,x)=>a+(+x.cost||0),0)+state.builds.filter(x=>x.carId===c.id).reduce((a,x)=>a+(+x.price||0),0):0);
+  const cost=(c?(+c.purchase||0)+state.service.filter(x=>x.carId===c.id).reduce((a,x)=>a+(+x.cost||0),0)+state.fuel.filter(x=>x.carId===c.id).reduce((a,x)=>a+(+x.cost||0),0)+state.builds.filter(x=>x.carId===c.id&&x.status==="Verbaut").reduce((a,x)=>a+(+x.price||0),0):0);
   $("statCost").textContent=money(cost);
   const hi=$("heroImage"),heroSrc=c&&(c.image||c.exampleImage);hi.innerHTML=heroSrc?`<img src="${heroSrc}" alt="">${!c.image&&c.exampleImage?`<a class="hero-credit" href="${c.exampleImageSource||'#'}" target="_blank" rel="noreferrer">Beispielbild · Wikimedia Commons</a>`:""}`:`<div class="hero-fallback"><b>JIGGY.</b><span>${c?esc(`${c.make} ${c.model}`):"YOUR CAR. YOUR STORY."}</span></div>`;
   let acts=[];
   state.service.filter(x=>c&&x.carId===c.id).forEach(x=>acts.push({d:x.date,t:x.type,s:money(x.cost)}));
   state.fuel.filter(x=>c&&x.carId===c.id).forEach(x=>acts.push({d:x.date,t:"Tankung",s:`${x.liters||0} l · ${money(x.cost)}`}));
   state.builds.filter(x=>c&&x.carId===c.id).forEach(x=>acts.push({d:x.date||"",t:x.name,s:x.status}));
+  state.legal.filter(x=>c&&x.carId===c.id&&x.type==="HU").forEach(x=>acts.push({d:x.date||"",t:"TÜV / HU",s:[x.result||x.status,x.nextDate?`Nächste HU: ${fmtDate(x.nextDate)}`:""].filter(Boolean).join(" · ")}));
   acts.sort((a,b)=>(b.d||"").localeCompare(a.d||""));
   $("activityList").innerHTML=acts.length?acts.slice(0,5).map(x=>item(x.t,[x.d,x.s].filter(Boolean).join(" · "),"")).join(""):'<div class="empty">Noch keine Aktivitäten.</div>';
-  const hv=$("heroVin"),he=$("heroEngine"),hd=$("heroDrive");
+  const hv=$("heroVin"),he=$("heroEngine"),hh=$("heroHu");
   if(hv)hv.textContent=c?.vin?`${c.vin.slice(0,5)}••••${c.vin.slice(-4)}`:"—";
   if(he)he.textContent=c?.vinData?.engineLiters?`${c.vinData.engineLiters} l${c.vinData.cylinders?` · ${c.vinData.cylinders} Zyl.`:""}`:(c?.variant||"—");
-  if(hd)hd.textContent=c?.vinData?.drive||"—";
+  if(hh){
+    const huRows=state.legal.filter(x=>c&&x.carId===c.id&&x.type==="HU"&&x.nextDate).sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+    const hu=huRows[0];
+    hh.textContent=hu?.nextDate?fmtDate(hu.nextDate):"—";
+    hh.classList.toggle("hu-overdue",!!(hu?.nextDate&&hu.nextDate<today()));
+  }
 }
 
 function renderExtras(){
@@ -321,7 +436,9 @@ function renderExtras(){
  if(!issues.length)$("vehicleStatus").innerHTML='<div class="status-main"><span class="status-dot"></span><div><strong>Alles OK</strong><span>Aktuell ist nichts dringend.</span></div></div>';
  else $("vehicleStatus").innerHTML=issues.slice(0,3).map(x=>`<div class="status-main ${x.level}"><span class="status-dot"></span><div><strong>${x.text}</strong><span>${x.sub}</span></div></div>`).join("");
  $("statusCount").textContent=issues.length?`${issues.length} Hinweis${issues.length===1?"":"e"}`:"Alles OK";
- $("reminderList").innerHTML=reminders.length?reminders.slice(0,4).map(x=>item(x.t,x.s,`<span class="status ${x.level}">${x.level==="bad"?"Fällig":"Bald"}</span>`)).join(""):'<div class="empty">Keine anstehenden Service-Erinnerungen.</div>';
+ const custom=(state.reminders||[]).filter(r=>r.carId===c.id&&!r.done).map(r=>reminderStatus(r,c)).filter(x=>x.level==="bad"||x.level==="warn").map(x=>({t:x.r.title,s:x.label,level:x.level}));
+ reminders=[...custom,...reminders];
+ $("reminderList").innerHTML=reminders.length?reminders.slice(0,5).map(x=>item(esc(x.t),esc(x.s),`<span class="status ${x.level}">${x.level==="bad"?"Fällig":"Bald"}</span>`)).join(""):'<div class="empty">Keine anstehenden Erinnerungen.</div>';
 
  const builds=state.builds.filter(x=>x.carId===c.id&&x.status!=="Verbaut");
  const n=builds[0];
@@ -333,7 +450,7 @@ function renderExtras(){
 
  const fuel=state.fuel.filter(x=>x.carId===c.id).reduce((a,x)=>a+(+x.cost||0),0);
  const service=services.reduce((a,x)=>a+(+x.cost||0),0);
- const buildsCost=state.builds.filter(x=>x.carId===c.id).reduce((a,x)=>a+(+x.price||0),0);
+ const buildsCost=state.builds.filter(x=>x.carId===c.id&&x.status==="Verbaut").reduce((a,x)=>a+(+x.price||0),0);
  const purchase=+c.purchase||0;
  $("costBreakdown").innerHTML=[["Kaufpreis",purchase],["Tanken",fuel],["Service",service],["Umbauten",buildsCost],["Gesamt",purchase+fuel+service+buildsCost]].map((x,i)=>`<div class="cost-row ${i===4?"total":""}"><span>${x[0]}</span><b>${money(x[1])}</b></div>`).join("");
 }
@@ -365,18 +482,243 @@ function renderLists(){
   $("carList").innerHTML=state.cars.length?state.cars.map(x=>`<div class="vehicle-card">
     <div class="vehicle-thumb">${(x.image||x.exampleImage)?`<img src="${x.image||x.exampleImage}" alt="">`:"<span>🚗</span>"}</div>
     <div class="vehicle-main"><h4>${cname(x)}</h4><p>${[x.year?`Baujahr ${x.year}`:"",`${num(x.km)} km`,x.purchase?money(x.purchase):"",x.plate].filter(Boolean).join(" · ")}</p>${!x.image&&x.exampleImage?`<span class="example-source-badge">Beispielbild</span>`:""}</div>
-    <div class="vehicle-actions">${x.id===state.activeCarId?'<span class="status good">Aktiv</span>':""}<button class="mini" onclick="activate('${x.id}')">Auswählen</button><button class="mini danger" onclick="del('cars','${x.id}')">Löschen</button></div>
+    <div class="vehicle-actions">${x.id===state.activeCarId?'<span class="status good">Aktiv</span>':""}<button class="mini" onclick="activate('${x.id}')">Auswählen</button><button class="mini" onclick="editCar('${x.id}')">Bearbeiten</button><button class="mini" onclick="exportVehiclePdf('${x.id}')">PDF-Akte</button><button class="mini danger" onclick="del('cars','${x.id}')">Löschen</button></div>
   </div>`).join(""):'<div class="empty">Noch kein Fahrzeug angelegt.</div>';
 
   $("serviceList").innerHTML=state.service.filter(x=>c&&x.carId===c.id).sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(x=>item(x.type,[x.date,`${num(x.km)} km`,money(x.cost),x.note].filter(Boolean).join(" · "),"",`<button class="mini danger" onclick="del('service','${x.id}')">Löschen</button>`)).join("")||'<div class="empty">Noch keine Service-Einträge.</div>';
 
-  $("legalList").innerHTML=state.legal.filter(x=>c&&x.carId===c.id).map(x=>{let cls=/Eingetragen|ABE|ECE|Serie/.test(x.status)?"good":/nötig|Unbekannt/.test(x.status)?"bad":"warn";return item(x.part,[x.number].filter(Boolean).join(" · "),`<span class="status ${cls}">${x.status}</span>`,`<button class="mini danger" onclick="del('legal','${x.id}')">Löschen</button>`)}).join("")||'<div class="empty">Noch keine TÜV/ABE-Einträge.</div>';
+  $("legalList").innerHTML=state.legal.filter(x=>c&&x.carId===c.id).map(x=>{if(x.type==="HU"){const cls=/^Bestanden/.test(x.result||x.status)?"good":"bad";return item("TÜV / HU",[x.date,x.km?`${num(x.km)} km`:"",x.nextDate?`Nächste HU: ${x.nextDate}`:"",x.number].filter(Boolean).join(" · "),`<span class="status ${cls}">${esc(x.result||x.status||"—")}</span>`,`<button class="mini danger" onclick="del('legal','${x.id}')">Löschen</button>`)}let cls=/Eingetragen|ABE|ECE|Serie/.test(x.status)?"good":/nötig|Unbekannt/.test(x.status)?"bad":"warn";return item(x.part,[x.number].filter(Boolean).join(" · "),`<span class="status ${cls}">${x.status}</span>`,`<button class="mini danger" onclick="del('legal','${x.id}')">Löschen</button>`)}).join("")||'<div class="empty">Noch keine TÜV/ABE-Einträge.</div>';
 
-  $("fuelList").innerHTML=state.fuel.filter(x=>c&&x.carId===c.id).sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(x=>item("Tankung",[x.date,`${num(x.km)} km`,`${x.liters||0} l`,money(x.cost)].join(" · "),"",`<button class="mini danger" onclick="del('fuel','${x.id}')">Löschen</button>`)).join("")||'<div class="empty">Noch keine Tankungen.</div>';
+  $("fuelList").innerHTML=state.fuel.filter(x=>c&&x.carId===c.id).sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(x=>item("Tankung",[x.date,`${num(x.km)} km`,`${x.liters||0} l`,money(x.cost),x.receiptFileName?`Beleg: ${esc(x.receiptFileName)}`:""].filter(Boolean).join(" · "),"",`${x.receiptFileId?`<button class="mini" onclick="openFuelReceipt('${x.id}')">Beleg</button>`:""}<button class="mini danger" onclick="del('fuel','${x.id}')">Löschen</button>`)).join("")||'<div class="empty">Noch keine Tankungen.</div>';
 
-  $("buildList").innerHTML=state.builds.filter(x=>c&&x.carId===c.id).map(x=>item(x.name,[x.category,money(x.price)].join(" · "),`<span class="status ${x.status==="Verbaut"?"good":""}">${x.status}</span>`,`<button class="mini danger" onclick="del('builds','${x.id}')">Löschen</button>`)).join("")||'<div class="empty">Noch keine Umbauten.</div>';
+  $("buildList").innerHTML=state.builds.filter(x=>c&&x.carId===c.id).map(x=>{const saved=Math.min(+x.saved||0,+x.price||0),pct=x.price?Math.round(saved/(+x.price||1)*100):0;const savings=x.status!=="Verbaut"?` · ${money(saved)} gespart (${pct}%)`:"";return item(x.name,[x.category,money(x.price)].join(" · ")+savings,`<span class="status ${x.status==="Verbaut"?"good":""}">${x.status}</span>`,`<button class="mini" onclick="editBuild('${x.id}')">Bearbeiten</button><button class="mini danger" onclick="del('builds','${x.id}')">Löschen</button>`)}).join("")||'<div class="empty">Noch keine Umbauten.</div>';
 }
-function render(){refreshSelectors();renderHome();renderExtras();renderGallery();renderLists();renderStats()}
+
+window.openFuelReceipt=async id=>{
+  const x=(state.fuel||[]).find(v=>v.id===id);if(!x?.receiptFileId)return toast("Kein Beleg gespeichert","warn");const f=await vaultGet(x.receiptFileId);if(!f)return toast("Belegdatei nicht gefunden","warn");
+  const url=URL.createObjectURL(f.blob),stage=$("vaultStage");activeVaultObjectUrl=url;if((f.type||"").startsWith("image/"))stage.innerHTML=`<img src="${url}" alt="Tankbeleg">`;else if(f.type==="application/pdf"||/\.pdf$/i.test(f.name))stage.innerHTML=`<iframe src="${url}"></iframe>`;else{const a=document.createElement("a");a.href=url;a.download=f.name;a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);return}
+  $("vaultModal").classList.add("open");$("vaultModal").setAttribute("aria-hidden","false");
+};
+
+const reportEsc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+function vehicleReportHtml(c){
+  const service=(state.service||[]).filter(x=>x.carId===c.id).sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+  const fuel=(state.fuel||[]).filter(x=>x.carId===c.id).sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+  const legal=(state.legal||[]).filter(x=>x.carId===c.id);const builds=(state.builds||[]).filter(x=>x.carId===c.id);const logs=(state.logs||[]).filter(x=>x.carId===c.id).sort((a,b)=>(b.date||"").localeCompare(a.date||""));const docs=(state.documents||[]).filter(x=>x.carId===c.id).sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+  const totalService=service.reduce((a,x)=>a+(+x.cost||0),0),totalFuel=fuel.reduce((a,x)=>a+(+x.cost||0),0),totalBuild=builds.filter(x=>x.status==="Verbaut").reduce((a,x)=>a+(+x.price||0),0);
+  const row=(cells)=>`<tr>${cells.map(x=>`<td>${reportEsc(x??"—")}</td>`).join("")}</tr>`;
+  const table=(heads,rows,empty="Keine Einträge")=>rows.length?`<table><thead><tr>${heads.map(h=>`<th>${reportEsc(h)}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table>`:`<p class="empty">${empty}</p>`;
+  const title=reportEsc(cname(c));
+  return `<!doctype html><html><head><meta charset="utf-8"><title>JIGGY Fahrzeugakte - ${title}</title><style>
+  @page{size:A4;margin:14mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#111;margin:0;font-size:10px}header{border-bottom:3px solid #e1262f;padding:0 0 14px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:flex-end}.brand{font-size:28px;font-weight:900}.brand i{color:#e1262f;font-style:normal}h1{font-size:22px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px;border-bottom:1px solid #ddd;padding-bottom:5px}p{margin:3px 0}.meta{color:#666}.facts{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}.fact{border:1px solid #ddd;border-radius:7px;padding:8px}.fact b{display:block;font-size:13px}.fact span{color:#666;font-size:8px;text-transform:uppercase}.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:10px}.sum{background:#f3f3f3;padding:8px;border-radius:7px}.sum b{display:block;font-size:12px}table{width:100%;border-collapse:collapse;margin:5px 0 12px;font-size:9px}th{background:#f2f2f2;text-align:left;padding:6px;border:1px solid #ddd}td{padding:6px;border:1px solid #ddd;vertical-align:top}.empty{color:#777;font-style:italic}.foot{margin-top:24px;padding-top:8px;border-top:1px solid #ddd;color:#777;font-size:8px}.avoid{break-inside:avoid} </style></head><body>
+  <header><div><div class="brand">JIGGY<i>.</i></div><div class="meta">Your car. Your story. - Fahrzeugakte</div></div><div class="meta">Export: ${new Date().toLocaleDateString("de-DE")}</div></header>
+  <h1>${title}</h1><p class="meta">${reportEsc(c.plate||"Ohne Kennzeichen")}${c.vin?` · VIN ${reportEsc(c.vin)}`:""}</p>
+  <h2>Fahrzeugdaten</h2><div class="facts">${[["Baujahr",c.year],["Kilometerstand",`${num(c.km)} km`],["Leistung",`${num(c.power)} PS`],["Drehmoment",`${num(c.torque)} Nm`],["Kraftstoff",c.fuel],["Getriebe",c.gearbox],["Kennzeichen",c.plate],["Kaufpreis",c.purchase?money(c.purchase):"—"]].map(x=>`<div class="fact"><b>${reportEsc(x[1]||"—")}</b><span>${reportEsc(x[0])}</span></div>`).join("")}</div>
+  <div class="summary">${[["Servicekosten",money(totalService)],["Tankkosten",money(totalFuel)],["Umbauten",money(totalBuild)],["Dokumente",docs.length]].map(x=>`<div class="sum"><b>${reportEsc(x[1])}</b><span>${reportEsc(x[0])}</span></div>`).join("")}</div>
+  <section><h2>Servicehistorie</h2>${table(["Datum","km","Arbeit","Kosten","Nächster Service","Notiz"],service.map(x=>row([x.date,num(x.km),x.type,money(x.cost),x.nextKm?`${num(x.nextKm)} km`:"—",x.note])) )}</section>
+  <section><h2>Tankhistorie</h2>${table(["Datum","km","Liter","Kosten","Beleg"],fuel.map(x=>row([x.date,num(x.km),x.liters?`${num(x.liters)} l`:"—",money(x.cost),x.receiptFileName||"—"])))}</section>
+  <section><h2>TÜV / ABE / Eintragungen</h2>${table(["Teil / Umbau","Status","Nummer / Hinweis"],legal.map(x=>row([x.type==="HU"?"TÜV / HU":x.part,x.type==="HU"?[x.result||x.status,x.date,x.km?`${num(x.km)} km`:"",x.nextDate?`Nächste HU ${x.nextDate}`:""].filter(Boolean).join(" · "):x.status,x.number])))}</section>
+  <section><h2>Umbauten</h2>${table(["Umbau","Kategorie","Status","Preis","Datum"],builds.map(x=>row([x.name,x.category,x.status,money(x.price),x.date||"—"])))}</section>
+  <section><h2>Logbuch</h2>${table(["Datum","Kategorie","Titel","Beschreibung"],logs.map(x=>row([x.date,x.category,x.title,x.text])))}</section>
+  <section><h2>Dokumentenübersicht</h2>${table(["Datum","Kategorie","Titel","Datei","Betrag","Notiz"],docs.map(x=>row([x.date,x.category,x.title,x.fileName,x.amount?money(x.amount):"—",x.note])))}</section>
+  <div class="foot">Diese JIGGY-Fahrzeugakte wurde aus den lokal gespeicherten Angaben erzeugt. Beleg- und Dokumentdateien werden aus Datenschutzgründen nicht in das PDF eingebettet; vorhandene Dateien sind in der Übersicht aufgeführt.</div>
+  </body></html>`;
+}
+window.exportVehiclePdf=async id=>{const c=car(id);if(!c)return toast("Fahrzeug nicht gefunden","warn");if(!window.myGarageDesktop?.saveVehiclePdf)return toast("PDF-Export ist in dieser Version nicht verfügbar","warn");try{const r=await window.myGarageDesktop.saveVehiclePdf({html:vehicleReportHtml(c),suggestedName:`JIGGY-${c.make||"Fahrzeug"}-${c.model||""}-Fahrzeugakte.pdf`});if(r?.ok)toast("Fahrzeugakte als PDF gespeichert");else if(!r?.canceled)toast(r?.error||"PDF konnte nicht gespeichert werden","warn")}catch(e){console.error(e);toast("PDF-Export fehlgeschlagen","warn")}};
+
+/* ===== JIGGY 1.7 — VAULT / REMINDERS / PUBLIC PROFILE ===== */
+const VAULT_DB="jiggy.vault.v1",VAULT_STORE="documents",CLOUD_KEY="jiggy.cloud.v1",PROFILE_KEY="jiggy.profile.v1";
+
+function vaultDb(){return new Promise((resolve,reject)=>{const r=indexedDB.open(VAULT_DB,1);r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains(VAULT_STORE))db.createObjectStore(VAULT_STORE,{keyPath:"id"})};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
+async function vaultPut(file){const db=await vaultDb(),id=uid();await new Promise((resolve,reject)=>{const tx=db.transaction(VAULT_STORE,"readwrite");tx.objectStore(VAULT_STORE).put({id,name:file.name,type:file.type||"application/octet-stream",size:file.size,blob:file,created:Date.now()});tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});db.close();return{id,name:file.name,type:file.type||"",size:file.size}}
+async function vaultGet(id){const db=await vaultDb();const out=await new Promise((resolve,reject)=>{const r=db.transaction(VAULT_STORE,"readonly").objectStore(VAULT_STORE).get(id);r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>reject(r.error)});db.close();return out}
+async function vaultDeleteFile(id){const db=await vaultDb();await new Promise((resolve,reject)=>{const tx=db.transaction(VAULT_STORE,"readwrite");tx.objectStore(VAULT_STORE).delete(id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});db.close()}
+const bytes=v=>{const n=+v||0;if(n<1024)return`${n} B`;if(n<1048576)return`${(n/1024).toFixed(1)} KB`;return`${(n/1048576).toFixed(1)} MB`};
+
+$("vaultDate")&&($("vaultDate").value=today());
+$("vaultForm")?.addEventListener("submit",async e=>{
+  e.preventDefault();const file=$("vaultFile").files?.[0];if(!file)return toast("Bitte eine Datei auswählen","warn");
+  if(file.size>25*1024*1024)return toast("Datei ist größer als 25 MB","warn");
+  if(!$("vaultCar").value)return toast("Bitte zuerst ein Fahrzeug anlegen","warn");
+  try{
+    const f=await vaultPut(file);
+    state.documents=state.documents||[];
+    state.documents.push({id:uid(),carId:$("vaultCar").value,category:$("vaultCategory").value,title:$("vaultTitle").value.trim(),date:$("vaultDate").value||today(),amount:+$("vaultAmount").value||0,note:$("vaultNote").value.trim(),fileId:f.id,fileName:f.name,fileType:f.type,fileSize:f.size,created:Date.now()});
+    save();e.target.reset();$("vaultDate").value=today();toast("Dokument sicher im Vault gespeichert");renderVault()
+  }catch(err){console.error(err);toast("Dokument konnte nicht gespeichert werden","warn")}
+});
+const vaultDrop=$("vaultDrop");
+if(vaultDrop){
+  ["dragenter","dragover"].forEach(ev=>vaultDrop.addEventListener(ev,e=>{e.preventDefault();vaultDrop.classList.add("drag")}));
+  ["dragleave","drop"].forEach(ev=>vaultDrop.addEventListener(ev,e=>{e.preventDefault();vaultDrop.classList.remove("drag")}));
+  vaultDrop.addEventListener("drop",e=>{const f=e.dataTransfer?.files?.[0];if(!f)return;const dt=new DataTransfer();dt.items.add(f);$("vaultFile").files=dt.files;$("vaultTitle").value||=f.name.replace(/\.[^.]+$/,"");});
+  vaultDrop.addEventListener("click",()=>$("vaultFile").click());
+}
+$("vaultSearch")?.addEventListener("input",renderVault);$("vaultCategoryFilter")?.addEventListener("change",renderVault);$("vaultFilter")?.addEventListener("change",renderVault);
+function renderVault(){
+  const box=$("vaultList");if(!box)return;
+  const carId=$("vaultFilter")?.value||state.activeCarId,q=($("vaultSearch")?.value||"").toLowerCase().trim(),cat=$("vaultCategoryFilter")?.value||"";
+  const rows=(state.documents||[]).filter(x=>(!carId||x.carId===carId)&&(!cat||x.category===cat)&&(!q||`${x.title} ${x.category} ${x.fileName} ${x.note}`.toLowerCase().includes(q))).sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+  box.innerHTML=rows.length?rows.map(x=>`<article class="vault-doc">
+    <div class="vault-icon">${/pdf/i.test(x.fileType||x.fileName)?"PDF":/image/i.test(x.fileType)?"IMG":"DOC"}</div>
+    <div class="vault-doc-main"><span>${esc(x.category)}</span><strong>${esc(x.title)}</strong><small>${[fmtDate(x.date),x.amount?money(x.amount):"",esc(x.fileName),bytes(x.fileSize)].filter(Boolean).join(" · ")}</small>${x.note?`<p>${esc(x.note)}</p>`:""}</div>
+    <div class="vault-doc-actions"><button class="mini" onclick="openVaultDoc('${x.id}')">Öffnen</button><button class="mini danger" onclick="deleteVaultDoc('${x.id}')">Löschen</button></div>
+  </article>`).join(""):'<div class="log-empty">Noch keine Dokumente für dieses Fahrzeug.</div>';
+}
+window.openVaultDoc=async id=>{
+  const meta=(state.documents||[]).find(x=>x.id===id),f=meta&&await vaultGet(meta.fileId);if(!f)return toast("Datei nicht gefunden","warn");
+  const url=URL.createObjectURL(f.blob),stage=$("vaultStage");
+  if((f.type||"").startsWith("image/"))stage.innerHTML=`<img src="${url}" alt="">`;
+  else if(f.type==="application/pdf"||/\.pdf$/i.test(f.name))stage.innerHTML=`<iframe src="${url}"></iframe>`;
+  else{const a=document.createElement("a");a.href=url;a.download=f.name;a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);return}
+  $("vaultModal").classList.add("open");$("vaultModal").setAttribute("aria-hidden","false");
+};
+let activeVaultObjectUrl="";
+function closeVault(){const modal=$("vaultModal"),stage=$("vaultStage");modal?.classList.remove("open");modal?.setAttribute("aria-hidden","true");if(stage)stage.innerHTML="";if(activeVaultObjectUrl){URL.revokeObjectURL(activeVaultObjectUrl);activeVaultObjectUrl=""}}
+window.closeVault=closeVault;
+$("vaultClose")?.addEventListener("click",e=>{e.preventDefault();e.stopPropagation();closeVault()});$("vaultModal")?.addEventListener("click",e=>{if(e.target===$("vaultModal"))closeVault()});document.addEventListener("keydown",e=>{if(e.key==="Escape"&&$("vaultModal")?.classList.contains("open"))closeVault()});
+window.deleteVaultDoc=async id=>{const x=(state.documents||[]).find(v=>v.id===id);if(!x||!confirm(`"${x.title}" wirklich löschen?`))return;try{await vaultDeleteFile(x.fileId)}catch{}state.documents=state.documents.filter(v=>v.id!==id);save();toast("Dokument gelöscht","warn");renderVault()};
+
+/* Reminders */
+function reminderStatus(r,c){
+  const now=new Date();now.setHours(0,0,0,0);let level="good",parts=[],days=null,kmLeft=null;
+  if(r.dueDate){const d=new Date(r.dueDate+"T12:00:00");days=Math.ceil((d-now)/86400000);if(days<0){level="bad";parts.push(`${Math.abs(days)} Tag${Math.abs(days)===1?"":"e"} überfällig`)}else if(days===0){level="bad";parts.push("heute fällig")}else if(days<=30){level="warn";parts.push(`in ${days} Tagen`)}else parts.push(fmtDate(r.dueDate))}
+  if(+r.dueKm>0&&c){kmLeft=(+r.dueKm||0)-(+c.km||0);if(kmLeft<=0){level="bad";parts.push(`${num(Math.abs(kmLeft))} km überfällig`)}else if(kmLeft<=3000&&level!=="bad"){level="warn";parts.push(`in ${num(kmLeft)} km`)}else parts.push(`bei ${num(r.dueKm)} km`)}
+  return{r,level,label:parts.join(" · ")||"Ohne Fälligkeit",days,kmLeft}
+}
+$("reminderForm")?.addEventListener("submit",e=>{
+  e.preventDefault();if(!$("reminderCar").value)return toast("Bitte zuerst ein Fahrzeug anlegen","warn");
+  state.reminders=state.reminders||[];state.reminders.push({id:uid(),carId:$("reminderCar").value,title:$("reminderTitle").value.trim(),category:$("reminderCategory").value,dueDate:$("reminderDate").value,dueKm:+$("reminderKm").value||0,note:$("reminderNote").value.trim(),notify:$("reminderNotify").checked,done:false,created:Date.now()});
+  save();e.target.reset();$("reminderNotify").checked=true;toast("Erinnerung gespeichert");render()
+});
+$("reminderFilter")?.addEventListener("change",renderReminderManager);
+function renderReminderManager(){
+  const box=$("reminderManagerList");if(!box)return;const carId=$("reminderFilter")?.value||state.activeCarId,c=car(carId);
+  const rows=(state.reminders||[]).filter(x=>!carId||x.carId===carId).map(x=>reminderStatus(x,car(x.carId))).sort((a,b)=>Number(a.r.done)-Number(b.r.done)||({bad:0,warn:1,good:2}[a.level]-{bad:0,warn:1,good:2}[b.level]));
+  box.innerHTML=rows.length?rows.map(x=>`<article class="reminder-row ${x.r.done?"done":x.level}">
+    <div class="reminder-mark"></div><div class="reminder-main"><span>${esc(x.r.category)}</span><strong>${esc(x.r.title)}</strong><small>${esc(x.label)}</small>${x.r.note?`<p>${esc(x.r.note)}</p>`:""}</div>
+    <div class="reminder-actions">${x.r.done?'<span class="status good">Erledigt</span>':`<span class="status ${x.level}">${x.level==="bad"?"Fällig":x.level==="warn"?"Bald":"Geplant"}</span>`}<button class="mini" onclick="toggleReminder('${x.r.id}')">${x.r.done?"Reaktivieren":"Erledigt"}</button><button class="mini danger" onclick="deleteReminder('${x.r.id}')">×</button></div>
+  </article>`).join(""):'<div class="log-empty">Noch keine eigenen Erinnerungen.</div>';
+}
+window.toggleReminder=id=>{const r=(state.reminders||[]).find(x=>x.id===id);if(!r)return;r.done=!r.done;save();render();};
+window.deleteReminder=id=>{if(!confirm("Erinnerung löschen?"))return;state.reminders=(state.reminders||[]).filter(x=>x.id!==id);save();render()};
+async function checkReminderNotifications(){
+  if(!window.myGarageDesktop?.notify)return;
+  const stampKey="jiggy.reminder.notify.v1",sent=JSON.parse(localStorage.getItem(stampKey)||"{}"),now=Date.now();let changed=false;
+  for(const r of state.reminders||[]){
+    if(r.done||!r.notify)continue;const st=reminderStatus(r,car(r.carId));if(st.level!=="bad"&&st.level!=="warn")continue;
+    const last=+sent[r.id]||0;if(now-last<20*60*60*1000)continue;
+    await window.myGarageDesktop.notify(`JIGGY · ${r.title}`,`${cname(car(r.carId))} · ${st.label}`);sent[r.id]=now;changed=true;
+  }
+  if(changed)localStorage.setItem(stampKey,JSON.stringify(sent));
+}
+setTimeout(checkReminderNotifications,1800);setInterval(checkReminderNotifications,60*60*1000);
+
+/* Public Profile */
+const JIGGY_CLOUD_DEFAULTS={url:"https://wmhphdbaytzwtrlonfot.supabase.co",baseUrl:"https://xigriffen.github.io/MyGarage/"};
+function cloudConfig(){try{return {...JIGGY_CLOUD_DEFAULTS,...JSON.parse(localStorage.getItem(CLOUD_KEY)||"{}")} }catch{return {...JIGGY_CLOUD_DEFAULTS}}}
+function saveCloudConfig(v){localStorage.setItem(CLOUD_KEY,JSON.stringify(v))}
+function profileConfig(){try{return JSON.parse(localStorage.getItem(PROFILE_KEY)||"{}")}catch{return{}}}
+function saveProfileConfig(v){localStorage.setItem(PROFILE_KEY,JSON.stringify(v))}
+function randomSecret(){const a=new Uint8Array(24);crypto.getRandomValues(a);return [...a].map(x=>x.toString(16).padStart(2,"0")).join("")}
+function slugify(s){return String(s||"car").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,34)||"car"}
+async function publicImageData(c){
+  const src=c&&(c.image||c.exampleImage);if(!src||!$("profileGallery")?.checked)return"";
+  try{
+    const img=new Image();img.src=src;await img.decode();const max=1100,scale=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight)),w=Math.max(1,Math.round(img.naturalWidth*scale)),h=Math.max(1,Math.round(img.naturalHeight*scale)),cv=document.createElement("canvas");cv.width=w;cv.height=h;cv.getContext("2d").drawImage(img,0,0,w,h);return cv.toDataURL("image/jpeg",.78)
+  }catch{return""}
+}
+function profilePayload(c,image=""){
+  const mods=$("profileMods")?.checked?(state.builds||[]).filter(x=>x.carId===c.id&&x.status==="Verbaut").slice(0,20).map(x=>({name:x.name,category:x.category,date:x.date||""})):[];
+  return{
+    version:1,displayName:$("profileName")?.value.trim()||cname(c),bio:$("profileBio")?.value.trim()||"",theme:$("profileTheme")?.value||"signature",
+    car:{make:c.make,model:c.model,variant:c.variant,year:c.year,image,
+      specs:$("profileSpecs")?.checked?{power:c.power,torque:c.torque,fuel:c.fuel,gearbox:c.gearbox}:null,
+      mileage:$("profileMileage")?.checked?c.km:null,plate:$("profilePlate")?.checked?c.plate:""},
+    mods,updatedAt:new Date().toISOString()
+  };
+}
+function loadProfileInputs(){
+  const p=profileConfig(),c=car($("profileCar")?.value);if(!$("profileName"))return;
+  if(!document.activeElement||!["profileName","profileBio"].includes(document.activeElement.id)){
+    $("profileName").value=p.displayName||"";$("profileBio").value=p.bio||"";
+  }
+  if(p.theme)$("profileTheme").value=p.theme;
+  ["Specs","Mileage","Plate","Mods","Gallery"].forEach(k=>{const el=$("profile"+k);if(el&&p["show"+k]!==undefined)el.checked=!!p["show"+k]});
+}
+function localProfileSettings(){
+  return{...profileConfig(),displayName:$("profileName").value.trim(),bio:$("profileBio").value.trim(),theme:$("profileTheme").value,showSpecs:$("profileSpecs").checked,showMileage:$("profileMileage").checked,showPlate:$("profilePlate").checked,showMods:$("profileMods").checked,showGallery:$("profileGallery").checked};
+}
+function renderPublicProfile(){
+  if(!$("profilePreview"))return;loadProfileInputs();const c=car($("profileCar")?.value),cfg=profileConfig();
+  if(!c){$("profilePreview").innerHTML='<div class="log-empty">Lege zuerst ein Fahrzeug an.</div>';return}
+  const mods=$("profileMods")?.checked?(state.builds||[]).filter(x=>x.carId===c.id&&x.status==="Verbaut").slice(0,4):[],img=$("profileGallery")?.checked?(c.image||c.exampleImage):"";
+  $("profilePreview").innerHTML=`<div class="public-preview-shell theme-${esc($("profileTheme")?.value||"signature")}">
+    <div class="public-preview-image">${img?`<img src="${img}" alt="">`:'<div class="profile-fallback">JIGGY.</div>'}<span>JIGGY PROFILE</span></div>
+    <div class="public-preview-copy"><small>YOUR CAR. YOUR STORY.</small><h2>${esc($("profileName")?.value.trim()||cname(c))}</h2><p>${esc($("profileBio")?.value.trim()||"Dieses Fahrzeug lebt in JIGGY.")}</p>
+    ${$("profileSpecs")?.checked?`<div class="public-specs"><b>${c.power||"—"}<span>PS</span></b><b>${c.torque||"—"}<span>NM</span></b><b>${c.year||"—"}<span>YEAR</span></b></div>`:""}
+    ${($("profileMileage")?.checked||$("profilePlate")?.checked)?`<div class="public-profile-details">${$("profileMileage")?.checked?`<span><small>KILOMETERSTAND</small><strong>${num(c.km)} km</strong></span>`:""}${$("profilePlate")?.checked?`<span><small>KENNZEICHEN</small><strong>${esc(c.plate||"—")}</strong></span>`:""}</div>`:""}
+    ${mods.length?`<div class="public-mods">${mods.map(x=>`<span>${esc(x.name)}</span>`).join("")}</div>`:""}</div></div>`;
+  const published=!!cfg.slug;$("profileStatusText").textContent=published?"Veröffentlicht":"Nicht veröffentlicht";$("profileStatusOrb").classList.toggle("online",published);$("copyProfileBtn").disabled=!published;$("unpublishProfileBtn").disabled=!published;
+}
+["profileName","profileBio","profileTheme","profileSpecs","profileMileage","profilePlate","profileMods","profileGallery"].forEach(id=>$(id)?.addEventListener(id.includes("Name")||id.includes("Bio")?"input":"change",()=>{saveProfileConfig(localProfileSettings());renderPublicProfile()}));
+$("profileCar")?.addEventListener("change",renderPublicProfile);
+
+
+const CLOUD_ADMIN_PIN="1505";
+function openCloudAdmin(){
+  const modal=$("cloudAdminModal");if(!modal)return;
+  $("cloudAdminPinStep").hidden=false;$("cloudAdminConfigStep").hidden=true;
+  $("cloudAdminPin").value="";$("cloudAdminPinError").textContent="";
+  modal.classList.add("open");modal.setAttribute("aria-hidden","false");
+  setTimeout(()=>$("cloudAdminPin")?.focus(),40);
+}
+function closeCloudAdmin(){
+  const modal=$("cloudAdminModal");if(!modal)return;
+  modal.classList.remove("open");modal.setAttribute("aria-hidden","true");
+}
+function unlockCloudAdmin(){
+  const pin=$("cloudAdminPin")?.value||"";
+  if(pin!==CLOUD_ADMIN_PIN){$("cloudAdminPinError").textContent="Falsche PIN.";$("cloudAdminPin")?.focus();return}
+  const c=cloudConfig();
+  $("cloudAdminPinStep").hidden=true;$("cloudAdminConfigStep").hidden=false;
+  $("cloudAdminUrl").value=c.url||"";$("cloudAdminKey").value=c.anonKey||"";$("cloudAdminBase").value=c.baseUrl||"";
+  setTimeout(()=>$("cloudAdminUrl")?.focus(),30);
+}
+$("cloudAdminBtn")?.addEventListener("click",openCloudAdmin);
+$("cloudAdminUnlock")?.addEventListener("click",unlockCloudAdmin);
+$("cloudAdminPin")?.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();unlockCloudAdmin()}});
+$("cloudAdminClose")?.addEventListener("click",closeCloudAdmin);
+$("cloudAdminCancel")?.addEventListener("click",closeCloudAdmin);
+$("cloudAdminModal")?.addEventListener("click",e=>{if(e.target===$("cloudAdminModal"))closeCloudAdmin()});
+$("cloudAdminSave")?.addEventListener("click",()=>{
+  const url=$("cloudAdminUrl")?.value.trim().replace(/\/$/,"")||"",key=$("cloudAdminKey")?.value.trim()||"",base=$("cloudAdminBase")?.value.trim()||"";
+  if(!url||!key||!base)return toast("Bitte alle Cloud-Felder ausfüllen","warn");
+  saveCloudConfig({url,anonKey:key,baseUrl:base});closeCloudAdmin();toast("JIGGY Cloud-Konfiguration gespeichert");
+});
+
+async function supabaseRpc(name,body){
+  const cfg=cloudConfig();if(!cfg.url||!cfg.anonKey)throw new Error("Supabase ist noch nicht konfiguriert.");
+  const r=await fetch(`${cfg.url}/rest/v1/rpc/${name}`,{method:"POST",headers:{"Content-Type":"application/json","apikey":cfg.anonKey,"Authorization":`Bearer ${cfg.anonKey}`},body:JSON.stringify(body)});
+  if(!r.ok){const txt=await r.text();throw new Error(txt.slice(0,220)||`HTTP ${r.status}`)}return r.text()
+}
+$("publishProfileBtn")?.addEventListener("click",async()=>{
+  const c=car($("profileCar").value),btn=$("publishProfileBtn"),status=$("profilePublishStatus");if(!c)return toast("Kein Fahrzeug ausgewählt","warn");
+  const cloud=cloudConfig();if(!cloud.url||!cloud.anonKey||!cloud.baseUrl){status.textContent="Bitte zuerst Project URL, Anon Key und Profil-URL eintragen.";status.className="profile-publish-status bad";return}
+  let p=profileConfig(),secret=p.secret||randomSecret(),slug=p.slug||`${slugify(`${c.make}-${c.model}`)}-${Math.random().toString(36).slice(2,8)}`;
+  btn.disabled=true;btn.textContent="Veröffentliche …";status.textContent="Profilbild wird vorbereitet …";
+  try{
+    const image=await publicImageData(c),payload=profilePayload(c,image);
+    await supabaseRpc("publish_vehicle_profile",{p_slug:slug,p_secret:secret,p_payload:payload});
+    p={...localProfileSettings(),slug,secret,carId:c.id,publishedAt:new Date().toISOString()};saveProfileConfig(p);
+    status.textContent="Profil ist online. Link kann jetzt geteilt werden.";status.className="profile-publish-status good";toast("JIGGY-Profil veröffentlicht");renderPublicProfile()
+  }catch(e){console.error(e);status.textContent="Veröffentlichung fehlgeschlagen: "+e.message;status.className="profile-publish-status bad"}
+  finally{btn.disabled=false;btn.textContent="Profil veröffentlichen"}
+});
+$("copyProfileBtn")?.addEventListener("click",async()=>{const p=profileConfig(),c=cloudConfig();if(!p.slug||!c.baseUrl)return;const url=`${c.baseUrl}${c.baseUrl.includes("?")?"&":"?"}id=${encodeURIComponent(p.slug)}`;try{await navigator.clipboard.writeText(url);toast("Profil-Link kopiert")}catch{prompt("Profil-Link:",url)}});
+$("unpublishProfileBtn")?.addEventListener("click",async()=>{const p=profileConfig();if(!p.slug||!p.secret||!confirm("Öffentliches Profil wirklich offline nehmen?"))return;try{await supabaseRpc("delete_vehicle_profile",{p_slug:p.slug,p_secret:p.secret});saveProfileConfig({...p,slug:"",secret:""});$("profilePublishStatus").textContent="Profil wurde offline genommen.";toast("Profil offline","warn");renderPublicProfile()}catch(e){$("profilePublishStatus").textContent="Löschen fehlgeschlagen: "+e.message}});
+
+function render(){refreshSelectors();renderHome();renderExtras();renderGallery();renderLists();renderStats();renderVault();renderReminderManager();renderPublicProfile()}
 $("exportBtn").onclick=()=>{const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="JIGGY_Backup.json";a.click();URL.revokeObjectURL(a.href)}
 $("importFile").onchange=async e=>{try{let s=JSON.parse(await e.target.files[0].text());state=Object.assign(blank(),s);save();render();show("home")}catch{alert("Backup konnte nicht gelesen werden.")}}
 $("resetBtn").onclick=()=>{if(confirm("Wirklich alle lokalen JIGGY-Daten löschen?")){state=blank();save();render();show("home")}}
@@ -400,17 +742,17 @@ function renderCostBars(parts){
 function drawMonthlyCosts(){
  const canvas=$("monthlyCostChart");if(!canvas)return;const ctx=canvas.getContext("2d"),ratio=window.devicePixelRatio||1,w=Math.max(600,canvas.clientWidth||900),h=300;canvas.width=w*ratio;canvas.height=h*ratio;ctx.setTransform(ratio,0,0,ratio,0,0);
  const now=new Date(),months=[];for(let i=11;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);months.push({key:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`,label:d.toLocaleDateString("de-DE",{month:"short"}),value:0})}
- const map=Object.fromEntries(months.map(x=>[x.key,x]));const add=(rows,key)=>rows.forEach(x=>{const k=String(x.date||"").slice(0,7);if(map[k])map[k].value+=+x[key]||0});add(scoped("fuel"),"cost");add(scoped("service"),"cost");add(scoped("builds"),"price");
+ const map=Object.fromEntries(months.map(x=>[x.key,x]));const add=(rows,key)=>rows.forEach(x=>{const k=String(x.date||"").slice(0,7);if(map[k])map[k].value+=+x[key]||0});add(scoped("fuel"),"cost");add(scoped("service"),"cost");add(scoped("builds").filter(x=>x.status==="Verbaut"),"price");
  ctx.clearRect(0,0,w,h);const max=Math.max(...months.map(x=>x.value),1),left=46,bottom=38,top=18,right=14,cw=w-left-right,ch=h-top-bottom,gap=10,bw=(cw-gap*(months.length-1))/months.length;ctx.font="11px Arial";ctx.textAlign="center";
  months.forEach((m,i)=>{const bh=m.value/max*(ch-20),x=left+i*(bw+gap),y=top+ch-bh;ctx.fillStyle="#2b2e34";ctx.fillRect(x,top,bw,ch);ctx.fillStyle="#e33434";ctx.fillRect(x,y,bw,bh);ctx.fillStyle="#8f949d";ctx.fillText(m.label,x+bw/2,h-14);if(m.value>0){ctx.fillStyle="#e9eaec";ctx.font="10px Arial";ctx.fillText(new Intl.NumberFormat("de-DE",{notation:"compact",maximumFractionDigits:1}).format(m.value)+" €",x+bw/2,Math.max(12,y-6));ctx.font="11px Arial"}});
 }
 function renderVehicleCompare(){
  const box=$("vehicleCostCompare");if(!box)return;if(!state.cars.length){box.innerHTML='<div class="empty">Noch keine Fahrzeuge.</div>';return}
- const rows=state.cars.map(c=>{const purchase=+c.purchase||0,fuel=sum(state.fuel.filter(x=>x.carId===c.id),"cost"),service=sum(state.service.filter(x=>x.carId===c.id),"cost"),builds=sum(state.builds.filter(x=>x.carId===c.id),"price");return {c,total:purchase+fuel+service+builds}}).sort((a,b)=>b.total-a.total),max=Math.max(...rows.map(x=>x.total),1);
+ const rows=state.cars.map(c=>{const purchase=+c.purchase||0,fuel=sum(state.fuel.filter(x=>x.carId===c.id),"cost"),service=sum(state.service.filter(x=>x.carId===c.id),"cost"),builds=sum(state.builds.filter(x=>x.carId===c.id&&x.status==="Verbaut"),"price");return {c,total:purchase+fuel+service+builds}}).sort((a,b)=>b.total-a.total),max=Math.max(...rows.map(x=>x.total),1);
  box.innerHTML=rows.map(x=>`<div class="compare-row"><div class="compare-top"><strong>${esc(cname(x.c))}</strong><b>${money(x.total)}</b></div><div class="stats-bar-track"><i style="width:${Math.max(2,x.total/max*100)}%"></i></div></div>`).join("");
 }
 function renderStats(){
- if(!$("statsTotalCost"))return;const cars=scopedCars(),fuel=scoped("fuel"),service=scoped("service"),builds=scoped("builds"),purchase=sum(cars,"purchase"),fuelCost=sum(fuel,"cost"),serviceCost=sum(service,"cost"),buildCost=sum(builds,"price"),total=purchase+fuelCost+serviceCost+buildCost,liters=sum(fuel,"liters"),fs=calcFuelStats(fuel);
+ if(!$("statsTotalCost"))return;const cars=scopedCars(),fuel=scoped("fuel"),service=scoped("service"),builds=scoped("builds").filter(x=>x.status==="Verbaut"),purchase=sum(cars,"purchase"),fuelCost=sum(fuel,"cost"),serviceCost=sum(service,"cost"),buildCost=sum(builds,"price"),total=purchase+fuelCost+serviceCost+buildCost,liters=sum(fuel,"liters"),fs=calcFuelStats(fuel);
  $("statsTotalCost").textContent=money(total);$("statsTotalSub").textContent=`${cars.length} Fahrzeug${cars.length===1?"":"e"} · inkl. Kaufpreis`;$("statsFuelCost").textContent=money(fuelCost);$("statsFuelSub").textContent=`${fuel.length} Tankung${fuel.length===1?"":"en"}`;$("statsConsumption").textContent=fs.consumption?`${fs.consumption.toFixed(1).replace(".",",")} l/100 km`:"—";$("statsBuildCost").textContent=money(buildCost);$("statsBuildSub").textContent=`${builds.length} Umbau${builds.length===1?"":"ten"}`;
  renderCostBars([["Kaufpreis",purchase],["Tanken",fuelCost],["Service",serviceCost],["Umbauten",buildCost]]);const avgLiter=liters?fuelCost/liters:0;$("statsFuelFacts").innerHTML=[["Getankte Menge",liters?`${num(liters.toFixed(1))} l`:"—"],["Ø Literpreis",avgLiter?`${avgLiter.toFixed(2).replace(".",",")} €/l`:"—"],["Verbrauchsintervalle",fs.segments],["Servicekosten",money(serviceCost)]].map(x=>`<div class="fact"><span>${x[0]}</span><strong>${x[1]}</strong></div>`).join("");drawMonthlyCosts();renderVehicleCompare();
 }

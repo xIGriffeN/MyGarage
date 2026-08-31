@@ -244,3 +244,209 @@ linear-gradient(45deg,#0b0e12 25%,#0e1217 25%,#0e1217 50%,#0b0e12 50%,#0b0e12 75
   .vin-row{grid-template-columns:1fr}.vin-facts{grid-template-columns:1fr 1fr}
 }
 @media(max-width:520px){.vin-facts{grid-template-columns:1fr}}
+
+
+/* ===== JIGGY 1.7 — PROFILE / VAULT / REMINDERS ===== */
+.sidebar{overflow-y:auto}
+.sidebar::-webkit-scrollbar{width:4px}.sidebar::-webkit-scrollbar-thumb{background:#292f38;border-radius:9px}
+.vault-grid,.profile-grid{grid-template-columns:minmax(330px,430px) minmax(0,1fr)}
+.vault-private-note{margin:14px 0 0;padding:11px;border:1px solid #29323a;background:#0a0d11;border-radius:11px;color:#7f8995;font-size:10px;line-height:1.5}
+.vault-drop{border:1px dashed #3b444f;background:#0a0d11;border-radius:13px;min-height:90px;display:grid;place-items:center;text-align:center;padding:15px;cursor:pointer;transition:.18s}
+.vault-drop strong{font-size:12px}.vault-drop span{display:block;color:var(--muted);font-size:9px;margin-top:4px}.vault-drop:hover,.vault-drop.drag{border-color:var(--accent);background:rgba(228,43,49,.055);transform:translateY(-1px)}
+.vault-toolbar{display:grid;grid-template-columns:1fr 190px;gap:8px;margin-bottom:12px}.vault-toolbar input,.vault-toolbar select{margin:0}
+.vault-list{display:grid;gap:9px}.vault-doc{display:grid;grid-template-columns:54px 1fr auto;gap:12px;align-items:center;padding:12px;border:1px solid var(--line);background:#0c0f14;border-radius:14px;transition:.16s}
+.vault-doc:hover{border-color:#39424d;transform:translateX(2px)}
+.vault-icon{width:54px;height:54px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(145deg,#1a2028,#10141a);border:1px solid #303844;color:#ff6c71;font-size:10px;font-weight:950;letter-spacing:.08em}
+.vault-doc-main>span{display:block;color:#798390;font-size:8px;text-transform:uppercase;letter-spacing:.13em}.vault-doc-main strong{display:block;font-size:13px;margin:3px 0}.vault-doc-main small{color:#8e97a3;font-size:9px}.vault-doc-main p{margin:6px 0 0;color:#b8bec6;font-size:10px}
+.vault-doc-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.vault-stage{width:min(1200px,94vw);height:min(86vh,900px);display:grid;place-items:center}.vault-stage iframe{width:100%;height:100%;border:0;border-radius:12px;background:white}.vault-stage img{max-width:100%;max-height:100%;border-radius:12px}
+.reminder-manager{display:grid;gap:9px}.reminder-row{display:grid;grid-template-columns:4px 1fr auto;gap:12px;align-items:center;background:#0c0f14;border:1px solid var(--line);border-radius:14px;padding:12px;overflow:hidden}
+.reminder-mark{width:4px;height:100%;min-height:58px;border-radius:99px;background:#4c5664}.reminder-row.warn .reminder-mark{background:#e6a938;box-shadow:0 0 18px rgba(230,169,56,.22)}.reminder-row.bad .reminder-mark{background:#ed454b;box-shadow:0 0 18px rgba(237,69,75,.26)}.reminder-row.done{opacity:.55}.reminder-main>span{color:#798390;font-size:8px;text-transform:uppercase;letter-spacing:.12em}.reminder-main strong{display:block;font-size:13px;margin:3px 0}.reminder-main small{color:#9ba4af;font-size:10px}.reminder-main p{margin:5px 0 0;color:#b8bec6;font-size:10px}.reminder-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.profile-hero{display:flex;justify-content:space-between;align-items:center;gap:28px;padding:34px;margin-bottom:14px;overflow:hidden;position:relative}.profile-hero:after{content:"↗";position:absolute;right:15%;top:-85px;font-size:250px;font-weight:950;color:rgba(255,255,255,.018);transform:rotate(-15deg)}.profile-hero h2{font-size:40px;letter-spacing:-.05em;margin:8px 0}.profile-hero p{max-width:720px;color:var(--muted);line-height:1.55;font-size:12px}
+.profile-status-orb{min-width:160px;display:flex;align-items:center;gap:9px;border:1px solid #303741;padding:12px 14px;border-radius:999px;background:#0a0d11;position:relative;z-index:2}.profile-status-orb span{width:9px;height:9px;border-radius:50%;background:#626b76}.profile-status-orb b{font-size:10px}.profile-status-orb.online span{background:#45cc70;box-shadow:0 0 0 5px rgba(69,204,112,.08),0 0 20px rgba(69,204,112,.4)}
+.profile-options{display:grid;grid-template-columns:1fr 1fr;gap:5px;border:1px solid #272e37;border-radius:13px;padding:8px;background:#0a0d11}.profile-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.profile-publish-status{font-size:10px;color:#88929e;margin-top:10px;line-height:1.5}.profile-publish-status.good{color:#78d594}.profile-publish-status.bad{color:#ff858a}
+.cloud-info{margin-top:16px;padding:14px;border:1px solid #26303a;border-radius:13px;background:#0a0d11}.cloud-info strong{font-size:11px}.cloud-info p{font-size:10px;color:var(--muted);line-height:1.55;margin:6px 0 0}
+.profile-preview-card{margin-top:14px}.public-preview{max-width:1100px;margin:auto}.public-preview-shell{display:grid;grid-template-columns:1.15fr .85fr;min-height:440px;background:#07090c;border:1px solid #2c333c;border-radius:22px;overflow:hidden;box-shadow:0 35px 90px rgba(0,0,0,.34)}
+.public-preview-image{position:relative;background:#0b0e13;overflow:hidden}.public-preview-image img{width:100%;height:100%;object-fit:cover;filter:saturate(.9) contrast(1.05)}.public-preview-image:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent 55%,rgba(7,9,12,.62))}.public-preview-image>span{position:absolute;left:20px;top:20px;z-index:2;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.16);padding:7px 9px;border-radius:8px;font-size:8px;letter-spacing:.14em;font-weight:900}.profile-fallback{height:100%;display:grid;place-items:center;font-size:60px;font-weight:950;letter-spacing:.06em}
+.public-preview-copy{display:flex;flex-direction:column;justify-content:center;padding:42px}.public-preview-copy>small{color:#e42b31;font-size:9px;font-weight:900;letter-spacing:.18em}.public-preview-copy h2{font-size:34px;line-height:1.02;letter-spacing:-.045em;margin:10px 0}.public-preview-copy>p{font-size:11px;color:#949da8;line-height:1.6}
+.public-specs{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:22px}.public-specs b{font-size:22px;background:#10141a;border:1px solid #252c35;border-radius:11px;padding:13px}.public-specs b span{display:block;color:#6f7985;font-size:7px;letter-spacing:.13em;margin-top:4px}.public-mods{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}.public-mods span{background:#171b21;border:1px solid #2b323b;border-radius:999px;padding:7px 9px;font-size:8px}
+.theme-street .public-preview-copy{background:linear-gradient(145deg,#111,#170c0d)}.theme-street .public-preview-image img{filter:contrast(1.15) saturate(.75)}.theme-clean{background:#e9e8e4;color:#101114}.theme-clean .public-preview-copy h2{color:#101114}.theme-clean .public-preview-copy>p{color:#666}.theme-clean .public-specs b{background:#fff;color:#111;border-color:#d1d1cf}.theme-clean .public-mods span{background:#fff;color:#111;border-color:#d2d1cd}
+@media(max-width:1050px){.vault-grid,.profile-grid{grid-template-columns:1fr}.public-preview-shell{grid-template-columns:1fr}.public-preview-image{min-height:340px}}
+@media(max-width:700px){.vault-toolbar{grid-template-columns:1fr}.vault-doc{grid-template-columns:44px 1fr}.vault-icon{width:44px;height:44px}.vault-doc-actions{grid-column:1/-1;justify-content:flex-start}.reminder-row{grid-template-columns:4px 1fr}.reminder-actions{grid-column:2;justify-content:flex-start}.profile-hero{align-items:flex-start;flex-direction:column}.profile-options{grid-template-columns:1fr}.public-preview-copy{padding:28px}.public-specs b{font-size:18px}}
+
+
+/* ===== JIGGY 1.7.1 — SIDEBAR SUBMENUS ===== */
+.nav-group{display:grid;gap:3px}
+.nav-parent{width:100%;justify-content:flex-start}
+.nav-parent i{margin-left:auto;font-style:normal;font-size:12px;color:#6f7782;transition:transform .18s ease}
+.nav-parent.open i{transform:rotate(180deg)}
+.nav-parent.active-parent{color:#fff;background:linear-gradient(90deg,rgba(228,43,49,.10),rgba(255,255,255,.015))}
+.nav-submenu{
+  display:grid;
+  gap:2px;
+  max-height:0;
+  overflow:hidden;
+  opacity:0;
+  transform:translateY(-4px);
+  transition:max-height .22s ease,opacity .18s ease,transform .18s ease;
+  padding-left:12px
+}
+.nav-submenu.open{max-height:120px;opacity:1;transform:none}
+.nav-sub{
+  padding:9px 12px;
+  min-height:38px;
+  font-size:11px;
+  color:#a8adb4
+}
+.nav-sub span{width:14px!important;color:#5f6670}
+.nav-sub.active{background:rgba(228,43,49,.12);box-shadow:inset 2px 0 0 var(--accent)}
+
+/* JIGGY 1.7.3 — clickable parent navigation */
+.nav-parent-row{display:grid;grid-template-columns:minmax(0,1fr) 34px;align-items:center;gap:2px;border-radius:12px}
+.nav-parent-row .nav-parent-link{width:100%;min-width:0}
+.nav-toggle{height:34px;width:34px;border:0;border-radius:9px;background:transparent;color:#727b87;cursor:pointer;font:700 12px/1 inherit;transition:.16s}
+.nav-toggle:hover{background:#171b21;color:#fff}
+.nav-toggle.open{transform:rotate(180deg)}
+.nav-parent-row.active-parent .nav-parent-link{color:#fff}
+.nav-parent-row.active-parent{background:linear-gradient(90deg,rgba(228,43,49,.07),transparent)}
+
+
+/* ===== JIGGY 1.7.4 — submenu interaction hardening ===== */
+.nav-parent-row{
+  position:relative;
+  overflow:visible;
+}
+.nav-toggle{
+  position:relative;
+  z-index:20;
+  pointer-events:auto !important;
+  user-select:none;
+  display:grid;
+  place-items:center;
+}
+.nav-submenu{
+  pointer-events:none;
+  visibility:hidden;
+}
+.nav-submenu.open{
+  pointer-events:auto;
+  visibility:visible;
+}
+.nav-submenu .nav{
+  position:relative;
+  z-index:5;
+}
+
+/* JIGGY 1.7.7 - open public profile layout */
+#profileView .profile-hero-open{
+  display:flex;justify-content:space-between;align-items:center;gap:28px;
+  padding:18px 2px 26px;margin-bottom:8px;position:relative;overflow:hidden;
+  background:transparent;border:0;border-radius:0;box-shadow:none;
+}
+#profileView .profile-hero-open:after{content:"↗";position:absolute;right:15%;top:-105px;font-size:250px;font-weight:950;color:rgba(255,255,255,.014);transform:rotate(-15deg)}
+#profileView .profile-hero-open h2{font-size:40px;letter-spacing:-.05em;margin:8px 0}
+#profileView .profile-hero-open p{max-width:720px;color:var(--muted);line-height:1.55;font-size:12px}
+#profileView .profile-grid{grid-template-columns:minmax(330px,560px);margin-top:6px}
+#profileView .profile-editor-card,
+#profileView .profile-preview-card{
+  background:transparent;border:0;border-radius:0;box-shadow:none;padding:0;
+}
+#profileView .profile-editor-card:hover,
+#profileView .profile-preview-card:hover{border-color:transparent;transform:none;box-shadow:none}
+#profileView .profile-preview-card{margin-top:30px}
+#profileView .profile-options{background:rgba(10,13,17,.42)}
+
+/* Reliable in-app Cloud Admin modal; does not depend on window.prompt() */
+.cloud-admin-modal{position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.72);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:20px}
+.cloud-admin-modal.open{display:flex}
+.cloud-admin-panel{width:min(560px,100%);background:#11151b;border:1px solid #303843;border-radius:20px;padding:22px;box-shadow:0 30px 100px rgba(0,0,0,.65)}
+.cloud-admin-head{display:flex;justify-content:space-between;align-items:flex-start;gap:15px;margin-bottom:18px}.cloud-admin-head h3{font-size:22px;margin:5px 0 0}
+.cloud-admin-close{width:38px;height:38px;border-radius:10px;border:1px solid #343b45;background:#1a1f26;color:#fff;font-size:24px;line-height:1}
+.cloud-admin-step{display:grid;gap:14px}.cloud-admin-step[hidden]{display:none!important}.cloud-admin-step p{margin:0}
+.cloud-admin-step input{margin-top:7px}.cloud-admin-error{min-height:18px;color:#ff7378;font-size:11px;font-weight:800}
+.cloud-admin-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:4px}
+@media(max-width:700px){#profileView .profile-hero-open{align-items:flex-start;flex-direction:column}.cloud-admin-panel{padding:18px}}
+
+
+/* JIGGY 1.7.8 - public profile visibility controls */
+#profileView .profile-options{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  padding:0;
+  border:0;
+  background:transparent;
+}
+#profileView .profile-options .share-check{
+  position:relative;
+  min-height:44px;
+  padding:0 14px!important;
+  gap:10px;
+  border:1px solid #2b323c;
+  border-radius:12px;
+  background:#0f1318;
+  color:#aeb7c2;
+  font-size:11px;
+  font-weight:850;
+  cursor:pointer;
+  transition:border-color .16s ease,background .16s ease,color .16s ease,transform .16s ease;
+  user-select:none;
+}
+#profileView .profile-options .share-check:hover{
+  border-color:#3a434f;
+  background:#131820;
+  color:#fff;
+}
+#profileView .profile-options .share-check:has(input:checked){
+  border-color:rgba(237,38,52,.72);
+  background:linear-gradient(180deg,rgba(237,38,52,.12),rgba(237,38,52,.055));
+  color:#fff;
+}
+#profileView .profile-options .share-check input{
+  appearance:none;
+  -webkit-appearance:none;
+  width:18px;
+  height:18px;
+  min-width:18px;
+  margin:0;
+  border:1px solid #4a535f;
+  border-radius:6px;
+  background:#090c10;
+  display:grid;
+  place-items:center;
+  transition:all .16s ease;
+}
+#profileView .profile-options .share-check input::after{
+  content:"";
+  width:7px;
+  height:4px;
+  border-left:2px solid #fff;
+  border-bottom:2px solid #fff;
+  transform:rotate(-45deg) scale(0);
+  transition:transform .12s ease;
+  margin-top:-2px;
+}
+#profileView .profile-options .share-check input:checked{
+  border-color:var(--accent);
+  background:var(--accent);
+  box-shadow:0 0 0 3px rgba(237,38,52,.10);
+}
+#profileView .profile-options .share-check input:checked::after{
+  transform:rotate(-45deg) scale(1);
+}
+#profileView .profile-editor-card > label:last-of-type{margin-top:12px}
+#profileView #profileTheme{
+  min-height:44px;
+  border-radius:12px;
+  background-color:#0f1318;
+  border-color:#2b323c;
+}
+@media(max-width:620px){#profileView .profile-options{grid-template-columns:1fr}}
+
+/* JIGGY 1.8.0 */
+.car-form-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.public-profile-details{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.public-profile-details>span{padding:10px 12px;border:1px solid #2b3139;border-radius:10px;background:rgba(255,255,255,.025)}.public-profile-details small{display:block;color:#777f89;font-size:8px;letter-spacing:.1em;font-weight:900}.public-profile-details strong{display:block;margin-top:4px;font-size:13px}.theme-clean .public-profile-details>span{background:#fff;border-color:#d2d1cd;color:#111}.theme-clean .public-profile-details small{color:#777}
+
+/* JIGGY 1.8.1 */
+.legal-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}.legal-fields[hidden]{display:none!important}#vaultModal .media-close{z-index:2147483647!important;position:fixed!important}#vaultModal .vault-stage{z-index:101;position:relative}@media(max-width:700px){.legal-fields{grid-template-columns:1fr}}
+
+/* JIGGY 1.8.2 */
+.hu-overdue{color:#ff4d5a!important}

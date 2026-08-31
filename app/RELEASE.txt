@@ -1,15 +1,5 @@
-JIGGY 1.6.0
+JIGGY 1.8.4
 
-YOUR CAR. YOUR IDENTITY.
-
-Neu:
-- VIN-Decoder über NHTSA vPIC mit 17-stelliger VIN
-- automatische Übernahme von Hersteller, Modell, Modelljahr, Kraftstoff, Karosserie, Motor- und Antriebsdaten
-- zusätzlicher Abgleich mit der lokalen JIGGY-Fahrzeugdatenbank für PS, Nm, Getriebe und Beispielbild
-- VIN wird im Fahrzeugprofil gespeichert
-- neues JIGGY Identity UI mit überarbeitetem Dashboard, Hero-Identity, Glas-/Performance-Look und neuen Animationen
-- Poster & Share Studio
-- neue Formate: Instagram Post, Story, Wallpaper 2560x1440, A4 und A3
-- neue Designs: JIGGY Signature, Performance, Blueprint, Street, Clean Dark, Minimal
-- Posteroptionen für Kennzeichen, VIN, Umbauten und Kaufpreis
-- bestehende Daten, App-ID, Update-Repo und lokale Speicher-IDs bleiben kompatibel
+- Geplante Umbauten zählen nicht mehr als ausgegebene Kosten.
+- Umbaukosten in Übersicht, Statistiken, Monatskosten, Fahrzeugvergleich und PDF-Akte berücksichtigen nur verbaute Umbauten.
+- Geplante Umbauten und Sparfortschritt bleiben separat sichtbar.

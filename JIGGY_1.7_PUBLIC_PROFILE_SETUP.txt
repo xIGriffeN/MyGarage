@@ -1,0 +1,43 @@
+JIGGY 1.7.0 — PUBLIC PROFILE EINMALIG EINRICHTEN
+=================================================
+
+A) SUPABASE (kostenlos)
+1. Ein kostenloses Projekt auf Supabase erstellen.
+2. SQL Editor öffnen.
+3. Datei supabase/JIGGY_PUBLIC_PROFILE_SETUP.sql komplett einfügen und ausführen.
+4. In Supabase unter Project Settings / API notieren:
+   - Project URL
+   - anon / publishable key
+   KEINEN service_role Key in JIGGY eintragen.
+
+B) PUBLIC PROFILE WEBSITE (GitHub Pages)
+1. In public-profile/config.js dieselbe Supabase Project URL + anon Key eintragen.
+2. Die Dateien mit dem restlichen Projekt zu GitHub hochladen.
+3. Repo -> Settings -> Pages -> Source: GitHub Actions.
+4. Workflow "Deploy JIGGY Public Profiles" ausführen bzw. auf main pushen.
+5. Nach erfolgreichem Deploy ist die Basis-URL ungefähr:
+   https://xigriffen.github.io/MyGarage/
+   bzw. die von GitHub Pages angezeigte URL.
+   Wenn Pages direkt den Inhalt aus public-profile deployed, trage diese angezeigte URL in JIGGY ein.
+
+C) IN JIGGY
+1. Public Profile öffnen.
+2. Project URL + anon Key eintragen.
+3. Öffentliche Profil-URL aus GitHub Pages eintragen.
+4. Speichern.
+5. Fahrzeug wählen, sichtbare Daten festlegen, "Profil veröffentlichen".
+6. "Link kopieren".
+
+DATENSCHUTZ
+- VIN wird nicht veröffentlicht.
+- Vault-Dateien/Rechnungen/ABEs werden nicht veröffentlicht.
+- Kaufpreis wird nicht veröffentlicht.
+- Logbuch-Mediendateien werden nicht veröffentlicht.
+- Kennzeichen und Kilometerstand sind opt-in.
+- Das öffentliche Titelbild wird vor Upload verkleinert/komprimiert.
+- Der lokale Owner-Secret bleibt in JIGGY und wird in Supabase nur als SHA-256 Hash gespeichert.
+
+VAULT
+- Dokumente werden in IndexedDB lokal auf dem PC gespeichert.
+- Das normale JSON-Backup enthält die eigentlichen Vault-Dateien NICHT.
+  Deshalb Originaldateien weiterhin separat sichern.

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, protocol } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, protocol, Notification } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
@@ -54,6 +54,42 @@ function createWindow() {
 let manualUpdateCheck = false;
 
 ipcMain.handle("app:get-version", () => app.getVersion());
+ipcMain.handle("app:notify", (_event, payload = {}) => {
+  try {
+    if (!Notification.isSupported()) return { ok:false, error:"Benachrichtigungen werden nicht unterstützt." };
+    const title = String(payload.title || "JIGGY").slice(0, 80);
+    const body = String(payload.body || "").slice(0, 220);
+    new Notification({
+      title,
+      body,
+      icon: path.join(__dirname, "app", "JIGGY.png")
+    }).show();
+    return { ok:true };
+  } catch (e) {
+    return { ok:false, error:e.message };
+  }
+});
+
+ipcMain.handle("vehicle:save-pdf", async (_event, payload = {}) => {
+  const html = String(payload.html || "");
+  if (!html || html.length > 8_000_000) return { ok:false, error:"Ungültiger PDF-Inhalt." };
+  const rawName = String(payload.suggestedName || "JIGGY-Fahrzeugakte.pdf").replace(/[\\/:*?"<>|]/g, "-").slice(0, 140);
+  const chosen = await dialog.showSaveDialog(mainWindow, { title:"JIGGY Fahrzeugakte speichern", defaultPath:path.join(app.getPath("documents"), rawName.endsWith(".pdf") ? rawName : rawName + ".pdf"), filters:[{name:"PDF",extensions:["pdf"]}] });
+  if (chosen.canceled || !chosen.filePath) return { ok:false, canceled:true };
+  let reportWindow;
+  try {
+    reportWindow = new BrowserWindow({ show:false, webPreferences:{ sandbox:true, contextIsolation:true, nodeIntegration:false } });
+    await reportWindow.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(html)}`);
+    const pdf = await reportWindow.webContents.printToPDF({ printBackground:true, pageSize:"A4", margins:{ marginType:"none" }, preferCSSPageSize:true });
+    fs.writeFileSync(chosen.filePath, pdf);
+    return { ok:true, path:chosen.filePath };
+  } catch (e) {
+    return { ok:false, error:e.message };
+  } finally {
+    try { reportWindow?.destroy(); } catch {}
+  }
+});
+
 function stripHtml(value = "") {
   return String(value).replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
 }
@@ -70,7 +106,7 @@ ipcMain.handle("vehicle:decode-vin", async (_event, payload = {}) => {
     const url = `https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValuesExtended/${encodeURIComponent(vin)}?${params.toString()}`;
     const response = await fetch(url, {
       headers: {
-        "User-Agent": "JIGGY/1.6.0 VIN Decoder",
+        "User-Agent": "JIGGY/1.7.0 VIN Decoder",
         "Accept": "application/json"
       }
     });
@@ -168,7 +204,7 @@ ipcMain.handle("vehicle:example-image", async (_event, payload = {}) => {
 
       const response = await fetch(`https://commons.wikimedia.org/w/api.php?${params.toString()}`, {
         headers: {
-          "User-Agent": "JIGGY/1.6.0 (vehicle example image cache)",
+          "User-Agent": "JIGGY/1.7.0 (vehicle example image cache)",
           "Accept": "application/json"
         }
       });
@@ -213,7 +249,7 @@ ipcMain.handle("vehicle:example-image", async (_event, payload = {}) => {
     const ii = page.imageinfo[0];
     const imageUrl = ii.thumburl || ii.url;
     const imageResponse = await fetch(imageUrl, {
-      headers: { "User-Agent": "JIGGY/1.6.0 vehicle-image-cache" }
+      headers: { "User-Agent": "JIGGY/1.7.0 vehicle-image-cache" }
     });
     if (!imageResponse.ok) throw new Error(`Bilddownload HTTP ${imageResponse.status}`);
 

@@ -15,12 +15,25 @@
 
     <button class="nav active" data-view="home"><span>⌂</span><b>Übersicht</b></button>
     <button class="nav" data-view="cars"><span>🚗</span><b>Fahrzeuge</b></button>
-    <button class="nav" data-view="service"><span>🧰</span><b>Service</b></button>
-    <button class="nav" data-view="legal"><span>📄</span><b>TÜV & ABE</b></button>
+    <div class="nav-group">
+      <div class="nav-parent-row"><button class="nav nav-parent nav-parent-link" type="button" data-view="service"><span>🧰</span><b>Service</b></button><button class="nav-toggle" type="button" data-submenu="serviceSubmenu" aria-label="Service Untermenü">⌄</button></div>
+      <div class="nav-submenu" id="serviceSubmenu">
+        <button class="nav nav-sub" data-view="service"><span>•</span><b>Service & Wartung</b></button>
+        <button class="nav nav-sub" data-view="reminders"><span>•</span><b>Erinnerungen</b></button>
+      </div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-parent-row"><button class="nav nav-parent nav-parent-link" type="button" data-view="legal"><span>📄</span><b>TÜV & ABE</b></button><button class="nav-toggle" type="button" data-submenu="legalSubmenu" aria-label="TÜV & ABE Untermenü">⌄</button></div>
+      <div class="nav-submenu" id="legalSubmenu">
+        <button class="nav nav-sub" data-view="legal"><span>•</span><b>TÜV & ABE</b></button>
+        <button class="nav nav-sub" data-view="vault"><span>•</span><b>Dokumente</b></button>
+      </div>
+    </div>
     <button class="nav" data-view="fuel"><span>⛽</span><b>Tankbuch</b></button>
     <button class="nav" data-view="build"><span>🔧</span><b>Umbauten</b></button>
     <button class="nav" data-view="logbook"><span>📸</span><b>Logbuch</b></button>
     <button class="nav" data-view="stats"><span>📊</span><b>Statistiken</b></button>
+    <button class="nav" data-view="profile"><span>↗</span><b>Public Profile</b></button>
     <button class="nav" data-view="more"><span>•••</span><b>Mehr</b></button>
   </aside>
 
@@ -45,7 +58,7 @@
           <div class="hero-identity" id="heroIdentity">
             <span><small>VIN</small><b id="heroVin">—</b></span>
             <span><small>Motor</small><b id="heroEngine">—</b></span>
-            <span><small>Antrieb</small><b id="heroDrive">—</b></span>
+            <span><small>Nächste HU</small><b id="heroHu">—</b></span>
           </div>
           <div class="hero-actions">
             <button class="primary" data-go="cars">Fahrzeug verwalten</button>
@@ -102,7 +115,7 @@
     <div class="card app-update-card">
   <div class="card-head"><div>
     <h3>JIGGY Update</h3>
-    <p class="muted">Installierte Version: <strong id="appVersion">1.6.0</strong></p>
+    <p class="muted">Installierte Version: <strong id="appVersion">1.7.4</strong></p>
   </div></div>
   <button class="btn" id="checkUpdatesBtn" type="button">Nach Updates suchen</button>
   <p class="muted small" id="updateStatus">Updates werden auch automatisch beim Start geprüft.</p>
@@ -111,7 +124,7 @@
     <section id="carsView" class="view">
       <div class="section-grid">
         <div class="card">
-          <div class="card-head"><div><span class="feature-kicker">GARAGE SETUP</span><h3>Fahrzeug hinzufügen</h3></div><span>VIN oder Datenbank</span></div>
+          <div class="card-head"><div><span class="feature-kicker">GARAGE SETUP</span><h3 id="carFormTitle">Fahrzeug hinzufügen</h3></div><span>VIN oder Datenbank</span></div>
           <form id="carForm" autocomplete="off">
 
             <div class="vin-panel">
@@ -170,7 +183,7 @@
               <label>Kennzeichen<input id="carPlate" placeholder="WES AB 123"></label>
             </div>
             <label>Eigenes Fahrzeugbild <span class="muted">(überschreibt das Beispielbild)</span><input id="carImage" type="file" accept="image/*"></label>
-            <button class="primary" type="submit">Fahrzeug speichern</button>
+            <div class="car-form-actions"><button class="primary" id="carSubmitBtn" type="submit">Fahrzeug speichern</button><button class="btn" id="cancelCarEdit" type="button" hidden>Abbrechen</button></div>
           </form>
         </div>
         <div>
@@ -216,13 +229,19 @@
           <div class="card-head"><h3>TÜV / ABE eintragen</h3><span>Einfacher Status statt Papierchaos</span></div>
           <form id="legalForm">
             <label>Fahrzeug<select id="legalCar"></select></label>
-            <label>Teil / Umbau<input id="legalPart" required placeholder="z. B. Felgen 20 Zoll"></label>
-            <label>Status<select id="legalStatus">
-              <option>Serie</option><option>ABE vorhanden</option><option>ECE</option><option>Eingetragen</option>
-              <option>Eintragung nötig</option><option>Teilegutachten</option><option>Unbekannt</option>
-            </select></label>
-            <label>Nummer / Hinweis<input id="legalNumber" placeholder="Optional"></label>
-            <button class="primary" type="submit">Eintrag speichern</button>
+            <label>Art<select id="legalType"><option value="HU">TÜV / HU</option><option value="ABE">ABE / Eintragung</option></select></label>
+            <div id="huFields" class="legal-fields">
+              <label>Prüfdatum<input id="legalDate" type="date"></label>
+              <label>Kilometerstand<input id="legalKm" type="number" min="0" placeholder="z. B. 65000"></label>
+              <label>Ergebnis<select id="legalHuResult"><option>Bestanden</option><option>Bestanden mit Hinweisen</option><option>Nicht bestanden</option></select></label>
+              <label>Nächste HU<input id="legalNextDate" type="date"></label>
+            </div>
+            <div id="abeFields" class="legal-fields" hidden>
+              <label>Teil / Umbau<input id="legalPart" placeholder="z. B. Felgen 20 Zoll"></label>
+              <label>Status<select id="legalStatus"><option>Serie</option><option>ABE vorhanden</option><option>ECE</option><option>Eingetragen</option><option>Eintragung nötig</option><option>Teilegutachten</option><option>Unbekannt</option></select></label>
+            </div>
+            <label>Prüfbericht / Nummer / Hinweis<input id="legalNumber" placeholder="Optional"></label>
+            <button class="primary" type="submit">TÜV / ABE speichern</button>
           </form>
         </div>
         <div class="card">
@@ -240,6 +259,7 @@
             <label>Fahrzeug<select id="fuelCar"></select></label>
             <div class="two"><label>Datum<input id="fuelDate" type="date"></label><label>Kilometer<input id="fuelKm" type="number" min="0"></label></div>
             <div class="two"><label>Liter<input id="fuelLiters" type="number" min="0" step="0.01"></label><label>Gesamtpreis €<input id="fuelCost" type="number" min="0" step="0.01"></label></div>
+            <label>Tankbeleg <span class="muted">(optional, Bild oder PDF bis 15 MB)</span><input id="fuelReceipt" type="file" accept="image/*,application/pdf,.pdf"></label>
             <button class="primary" type="submit">Tankung speichern</button>
           </form>
         </div>
@@ -259,7 +279,7 @@
             <label>Umbau<input id="buildName" required placeholder="z. B. Fahrwerk"></label>
             <div class="two"><label>Preis €<input id="buildPrice" type="number" min="0"></label><label>Bereits gespart €<input id="buildSaved" type="number" min="0" value="0"></label></div><label>Kategorie<select id="buildCategory"><option>Performance</option><option>Optik</option><option>Fahrwerk</option><option>Sound</option><option>Innenraum</option></select></label>
             <label>Status<select id="buildStatus"><option>Geplant</option><option>Bestellt</option><option>Verbaut</option></select></label>
-            <button class="primary" type="submit">Umbau speichern</button>
+            <div class="form-actions"><button class="primary" id="buildSubmitBtn" type="submit">Umbau speichern</button><button class="ghost" id="buildCancelEdit" type="button" hidden>Abbrechen</button></div>
           </form>
         </div>
         <div class="card">
@@ -321,6 +341,127 @@
       <div class="card stats-chart-card"><div class="card-head"><div><h3>Fahrzeugvergleich</h3><p class="muted">Gesamtausgaben je Fahrzeug</p></div></div><div id="vehicleCostCompare" class="vehicle-cost-compare"></div></div>
     </section>
 
+
+    <section id="vaultView" class="view">
+      <div class="section-grid vault-grid">
+        <div class="card">
+          <div class="card-head">
+            <div><span class="feature-kicker">JIGGY VAULT</span><h3>Dokument ablegen</h3></div>
+            <span>Lokal & privat</span>
+          </div>
+          <form id="vaultForm">
+            <label>Fahrzeug<select id="vaultCar"></select></label>
+            <div class="two">
+              <label>Kategorie<select id="vaultCategory">
+                <option>Rechnung</option><option>ABE / Teilegutachten</option><option>TÜV / HU</option>
+                <option>Servicebeleg</option><option>Versicherung</option><option>Kaufvertrag</option><option>Sonstiges</option>
+              </select></label>
+              <label>Datum<input id="vaultDate" type="date"></label>
+            </div>
+            <label>Titel<input id="vaultTitle" required placeholder="z. B. H&R Federn ABE"></label>
+            <div class="two">
+              <label>Betrag €<input id="vaultAmount" type="number" min="0" step="0.01" placeholder="0"></label>
+              <label>Datei<input id="vaultFile" type="file" accept=".pdf,image/*,.txt,.doc,.docx" required></label>
+            </div>
+            <label>Notiz<textarea id="vaultNote" rows="3" placeholder="Optional"></textarea></label>
+            <div class="vault-drop" id="vaultDrop">
+              <strong>Datei hierher ziehen</strong>
+              <span>PDF, Bild oder Dokument · max. 25 MB</span>
+            </div>
+            <button class="primary" type="submit">Im Vault speichern</button>
+          </form>
+          <p class="vault-private-note">🔒 Dateien bleiben auf diesem PC in JIGGY gespeichert und werden nicht in das öffentliche Profil hochgeladen.</p>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <div><span class="feature-kicker">DIGITALE FAHRZEUGAKTE</span><h3>Meine Dokumente</h3></div>
+            <select id="vaultFilter" class="compact-select"></select>
+          </div>
+          <div class="vault-toolbar">
+            <input id="vaultSearch" placeholder="Dokumente durchsuchen …">
+            <select id="vaultCategoryFilter"><option value="">Alle Kategorien</option>
+              <option>Rechnung</option><option>ABE / Teilegutachten</option><option>TÜV / HU</option>
+              <option>Servicebeleg</option><option>Versicherung</option><option>Kaufvertrag</option><option>Sonstiges</option>
+            </select>
+          </div>
+          <div id="vaultList" class="vault-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="remindersView" class="view">
+      <div class="section-grid">
+        <div class="card">
+          <div class="card-head">
+            <div><span class="feature-kicker">JIGGY REMINDERS</span><h3>Erinnerung erstellen</h3></div>
+            <span>Datum oder Kilometer</span>
+          </div>
+          <form id="reminderForm">
+            <label>Fahrzeug<select id="reminderCar"></select></label>
+            <label>Titel<input id="reminderTitle" required placeholder="z. B. Ölwechsel"></label>
+            <div class="two">
+              <label>Kategorie<select id="reminderCategory">
+                <option>Service</option><option>TÜV / HU</option><option>Versicherung</option>
+                <option>Reifen</option><option>Umbau</option><option>Sonstiges</option>
+              </select></label>
+              <label>Fällig am<input id="reminderDate" type="date"></label>
+            </div>
+            <label>Fällig bei Kilometerstand<input id="reminderKm" type="number" min="0" placeholder="Optional"></label>
+            <label>Notiz<textarea id="reminderNote" rows="3" placeholder="Optional"></textarea></label>
+            <label class="share-check"><input id="reminderNotify" type="checkbox" checked> Windows-Benachrichtigung bei Fälligkeit</label>
+            <button class="primary" type="submit">Erinnerung speichern</button>
+          </form>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <div><span class="feature-kicker">UPCOMING</span><h3>Anstehend</h3></div>
+            <select id="reminderFilter" class="compact-select"></select>
+          </div>
+          <div id="reminderManagerList" class="reminder-manager"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="profileView" class="view">
+      <div class="profile-hero profile-hero-open">
+        <div>
+          <span class="feature-kicker">JIGGY PUBLIC PROFILE</span>
+          <h2>Dein Auto. Ein Link.</h2>
+          <p>Erstelle ein öffentliches Fahrzeugprofil. Private Daten wie VIN, Dokumente, Rechnungen und Kaufpreis werden niemals automatisch veröffentlicht.</p>
+        </div>
+        <div class="profile-status-orb" id="profileStatusOrb"><span></span><b id="profileStatusText">Nicht veröffentlicht</b></div>
+      </div>
+
+      <div class="section-grid profile-grid">
+        <div class="profile-editor-card">
+          <div class="card-head"><div><h3>Profil gestalten</h3><p class="muted">Du entscheidest, was öffentlich sichtbar ist.</p></div></div>
+          <label>Fahrzeug<select id="profileCar"></select></label>
+          <label>Profilname<input id="profileName" maxlength="80" placeholder="z. B. Jiggy's S4"></label>
+          <label>Beschreibung<textarea id="profileBio" rows="4" maxlength="500" placeholder="Kurze Story zu deinem Build …"></textarea></label>
+          <div class="profile-options">
+            <label class="share-check"><input id="profileSpecs" type="checkbox" checked> Technische Daten</label>
+            <label class="share-check"><input id="profileMileage" type="checkbox"> Kilometerstand</label>
+            <label class="share-check"><input id="profilePlate" type="checkbox"> Kennzeichen</label>
+            <label class="share-check"><input id="profileMods" type="checkbox" checked> Umbauten</label>
+            <label class="share-check"><input id="profileGallery" type="checkbox" checked> Titelbild</label>
+          </div>
+          <label>Design<select id="profileTheme"><option value="signature">JIGGY Signature</option><option value="street">Street</option><option value="clean">Clean</option></select></label>
+          <div class="profile-actions">
+            <button class="primary" id="publishProfileBtn" type="button">Profil veröffentlichen</button>
+            <button class="secondary" id="copyProfileBtn" type="button" disabled>Link kopieren</button>
+            <button class="mini danger" id="unpublishProfileBtn" type="button" disabled>Offline nehmen</button>
+          </div>
+          <div id="profilePublishStatus" class="profile-publish-status">Bereit zum Veröffentlichen. Du bestimmst, was öffentlich sichtbar ist.</div>
+        </div>
+
+      </div>
+
+      <div class="profile-preview-card">
+        <div class="card-head"><div><h3>Live-Vorschau</h3><p class="muted">So wirkt dein öffentliches JIGGY-Profil.</p></div></div>
+        <div id="profilePreview" class="public-preview"></div>
+      </div>
+    </section>
+
 <section id="moreView" class="view">
       <div class="card">
         <div class="card-head"><h3>Mehr</h3><span>Selten benötigte Funktionen</span></div>
@@ -328,10 +469,35 @@
           <button id="exportBtn">Backup exportieren</button>
           <label class="file-button">Backup importieren<input id="importFile" type="file" accept="application/json"></label>
           <button id="resetBtn" class="danger">Alle Daten löschen</button>
+          <button id="cloudAdminBtn" type="button">JIGGY Cloud Admin 🔒</button>
         </div>
       </div>
     </section>
   </main><div id="toastHost" class="toast-host"></div>
+
+<div id="cloudAdminModal" class="cloud-admin-modal" aria-hidden="true">
+  <div class="cloud-admin-panel">
+    <div class="cloud-admin-head">
+      <div><span class="feature-kicker">JIGGY SYSTEM</span><h3>Cloud Admin</h3></div>
+      <button id="cloudAdminClose" class="cloud-admin-close" type="button" aria-label="Schließen">×</button>
+    </div>
+    <div id="cloudAdminPinStep" class="cloud-admin-step">
+      <p class="muted">Geschützter Bereich. PIN eingeben.</p>
+      <label>Admin-PIN<input id="cloudAdminPin" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="••••"></label>
+      <div id="cloudAdminPinError" class="cloud-admin-error"></div>
+      <button id="cloudAdminUnlock" class="primary" type="button">Entsperren</button>
+    </div>
+    <div id="cloudAdminConfigStep" class="cloud-admin-step" hidden>
+      <label>Supabase Project URL<input id="cloudAdminUrl" type="url" placeholder="https://…supabase.co"></label>
+      <label>Supabase Publishable Key<input id="cloudAdminKey" type="password" autocomplete="off" placeholder="sb_publishable_…"></label>
+      <label>Öffentliche Profil-URL<input id="cloudAdminBase" type="url" placeholder="https://…github.io/…/"></label>
+      <div class="cloud-admin-actions">
+        <button id="cloudAdminSave" class="primary" type="button">Speichern</button>
+        <button id="cloudAdminCancel" class="secondary" type="button">Abbrechen</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script src="vehicle-db.js"></script>
 <script src="app.js"></script>
@@ -384,6 +550,11 @@
       </div>
     </div>
   </div>
+</div>
+
+<div id="vaultModal" class="media-lightbox" aria-hidden="true">
+  <button class="media-close" type="button" id="vaultClose" onclick="closeVault()">×</button>
+  <div class="vault-stage" id="vaultStage"></div>
 </div>
 
 </body>
