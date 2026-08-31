@@ -100,7 +100,7 @@ function load(){
     s.service=old.service||old.services||[];
     s.legal=old.legal||[];
     s.fuel=old.fuel||[];
-    s.builds=old.builds||[];s.gallery=old.gallery||[];
+    s.builds=old.builds||[];s.gallery=old.gallery||[];s.logs=old.logs||[];
     s.activeCarId=old.activeCarId||s.cars[0]?.id||null;
     return s
   }catch{return blank()}
@@ -145,6 +145,74 @@ function refreshSelectors(){
 $("globalCar").onchange=e=>setActive(e.target.value);
 ["serviceCar","legalCar","fuelCar","buildCar"].forEach(id=>$(id).onchange=e=>setActive(e.target.value));
 
+
+let pendingVinData=null;
+function normalizeVin(v){return String(v||"").toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g,"").slice(0,17)}
+function bestVehicleDbMatch(d){
+  if(!d)return null;
+  const make=(d.make||"").toLowerCase(), model=(d.model||"").toLowerCase(), year=+d.year||0;
+  const candidates=VEHICLE_DB.filter(v=>{
+    const vm=(v.make||"").toLowerCase(), vmod=(v.model||"").toLowerCase();
+    const makeOk=vm===make || vm.includes(make) || make.includes(vm);
+    const modelOk=vmod===model || vmod.includes(model) || model.includes(vmod);
+    return makeOk&&modelOk;
+  });
+  if(!candidates.length)return null;
+  return candidates.sort((a,b)=>{
+    const ay=Math.abs((+a.year||year)-year), by=Math.abs((+b.year||year)-year);
+    return ay-by;
+  })[0]||null;
+}
+function renderVinFacts(d){
+  const box=$("vinDecodeFacts");if(!box)return;
+  if(!d){box.innerHTML="";return}
+  const rows=[
+    ["Hersteller",d.make],["Modell",d.model],["Modelljahr",d.year],
+    ["Baureihe",d.series],["Karosserie",d.body],["Kraftstoff",d.fuel],
+    ["Motor",d.engineLiters?`${d.engineLiters} l${d.cylinders?` · ${d.cylinders} Zyl.`:""}`:d.engineModel],
+    ["Antrieb",d.drive],["Werk", [d.plantCity,d.plantCountry].filter(Boolean).join(", ")]
+  ].filter(x=>x[1]);
+  box.innerHTML=rows.map(x=>`<div class="vin-fact"><small>${esc(x[0])}</small><strong>${esc(x[1])}</strong></div>`).join("");
+}
+async function decodeCurrentVin(){
+  const vin=normalizeVin($("carVin").value);$("carVin").value=vin;
+  const status=$("vinDecodeStatus"),btn=$("decodeVinBtn");
+  if(vin.length!==17){status.textContent="VIN muss genau 17 Zeichen haben.";status.className="vin-status bad";return}
+  if(!window.myGarageDesktop?.decodeVin){status.textContent="VIN-Decoding ist nur in der Windows-App verfügbar.";status.className="vin-status bad";return}
+  btn.disabled=true;btn.textContent="Analysiere…";status.textContent="VIN wird analysiert …";status.className="vin-status loading";renderVinFacts(null);
+  try{
+    const r=await window.myGarageDesktop.decodeVin(vin,$("carYear").value);
+    if(!r?.ok){status.textContent=r?.error||"VIN konnte nicht decodiert werden.";status.className="vin-status bad";return}
+    pendingVinData=r.data||{};
+    renderVinFacts(pendingVinData);
+    const d=pendingVinData,match=bestVehicleDbMatch(d);
+    if(d.make)$("carMake").value=d.make;
+    if(d.model)$("carModel").value=d.model;
+    if(d.year)$("carYear").value=d.year;
+    if(d.fuel)$("carFuel").value=d.fuel;
+    if(d.series&&!$("carVariant").value)$("carVariant").value=d.series;
+    if(match){
+      if(!$("carVariant").value||$("carVariant").value===d.series)$("carVariant").value=match.variant||d.series||"";
+      $("carPower").value=match.power||$("carPower").value;
+      $("carTorque").value=match.torque||$("carTorque").value;
+      $("carFuel").value=match.fuel||d.fuel||$("carFuel").value;
+      $("carGearbox").value=match.gearbox||$("carGearbox").value;
+      $("vehicleSearch").value=vehicleLabel(match);
+      await loadExampleImageForVehicle(match,0);
+      status.textContent="VIN erkannt · JIGGY-Datenbank hat passende Fahrzeugdaten ergänzt.";
+    }else{
+      const pseudo={make:d.make||"",model:d.model||"",variant:d.series||"",year:d.year||0,imageQuery:[d.make,d.model,d.year].filter(Boolean).join(" ")};
+      if(d.make||d.model)await loadExampleImageForVehicle(pseudo,0);
+      status.textContent="VIN erkannt. Nicht alle technischen Daten sind für dieses Fahrzeug verfügbar.";
+    }
+    status.className="vin-status good";toast("VIN erfolgreich decodiert");
+  }catch(e){status.textContent="VIN-Abfrage fehlgeschlagen.";status.className="vin-status bad"}
+  finally{btn.disabled=false;btn.textContent="VIN decodieren"}
+}
+$("decodeVinBtn")?.addEventListener("click",decodeCurrentVin);
+$("carVin")?.addEventListener("input",e=>{e.target.value=normalizeVin(e.target.value);e.target.classList.toggle("vin-complete",e.target.value.length===17)});
+$("carVin")?.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();decodeCurrentVin()}});
+
 async function fileData(file){
   if(!file)return"";
   if(file.size>3_000_000)throw new Error("Bild zu groß");
@@ -155,8 +223,8 @@ $("carForm").onsubmit=async e=>{
   e.preventDefault();
   let image="";try{image=await fileData($("carImage").files[0])}catch{return alert("Bild bitte kleiner als 3 MB wählen.")}
   const ex=pendingExampleImage||{};
-  const c={id:uid(),make:$("carMake").value.trim(),model:$("carModel").value.trim(),variant:$("carVariant").value.trim(),year:+$("carYear").value||0,km:+$("carKm").value||0,power:+$("carPower").value||0,torque:+$("carTorque").value||0,fuel:$("carFuel").value.trim(),gearbox:$("carGearbox").value.trim(),purchase:+$("carPurchase").value||0,plate:$("carPlate").value.trim(),image,exampleImage:ex.url||"",exampleImageSource:ex.sourceUrl||"",exampleImageLicense:ex.license||"",exampleImageArtist:ex.artist||"",exampleImageQuery:(pendingVehicle?.imageQuery||vehicleLabel(pendingVehicle||{make:$("carMake").value,model:$("carModel").value,variant:$("carVariant").value}))};
-  state.cars.push(c);state.activeCarId=c.id;save();e.target.reset();pendingExampleImage=null;pendingVehicle=null;setExamplePreview(null,"Wähle ein Fahrzeug aus der Datenbank.");toast("Fahrzeug gespeichert");render();show("home")
+  const c={id:uid(),vin:normalizeVin($("carVin")?.value),vinData:pendingVinData||null,make:$("carMake").value.trim(),model:$("carModel").value.trim(),variant:$("carVariant").value.trim(),year:+$("carYear").value||0,km:+$("carKm").value||0,power:+$("carPower").value||0,torque:+$("carTorque").value||0,fuel:$("carFuel").value.trim(),gearbox:$("carGearbox").value.trim(),purchase:+$("carPurchase").value||0,plate:$("carPlate").value.trim(),image,exampleImage:ex.url||"",exampleImageSource:ex.sourceUrl||"",exampleImageLicense:ex.license||"",exampleImageArtist:ex.artist||"",exampleImageQuery:(pendingVehicle?.imageQuery||vehicleLabel(pendingVehicle||{make:$("carMake").value,model:$("carModel").value,variant:$("carVariant").value}))};
+  state.cars.push(c);state.activeCarId=c.id;save();e.target.reset();pendingExampleImage=null;pendingVehicle=null;pendingVinData=null;renderVinFacts(null);$("vinDecodeStatus").textContent="Noch keine VIN geprüft.";setExamplePreview(null,"Wähle ein Fahrzeug aus der Datenbank.");toast("Fahrzeug gespeichert");render();show("home")
 };
 $("serviceDate").value=today();$("fuelDate").value=today();
 
@@ -224,6 +292,10 @@ function renderHome(){
   state.builds.filter(x=>c&&x.carId===c.id).forEach(x=>acts.push({d:x.date||"",t:x.name,s:x.status}));
   acts.sort((a,b)=>(b.d||"").localeCompare(a.d||""));
   $("activityList").innerHTML=acts.length?acts.slice(0,5).map(x=>item(x.t,[x.d,x.s].filter(Boolean).join(" · "),"")).join(""):'<div class="empty">Noch keine Aktivitäten.</div>';
+  const hv=$("heroVin"),he=$("heroEngine"),hd=$("heroDrive");
+  if(hv)hv.textContent=c?.vin?`${c.vin.slice(0,5)}••••${c.vin.slice(-4)}`:"—";
+  if(he)he.textContent=c?.vinData?.engineLiters?`${c.vinData.engineLiters} l${c.vinData.cylinders?` · ${c.vinData.cylinders} Zyl.`:""}`:(c?.variant||"—");
+  if(hd)hd.textContent=c?.vinData?.drive||"—";
 }
 
 function renderExtras(){
@@ -402,43 +474,105 @@ function drawCover(ctx,img,x,y,w,h){
 async function renderShareCard(){
   const c=shareActiveCar(),canvas=document.getElementById("shareCanvas");if(!c||!canvas)return;
   const format=document.getElementById("shareFormat")?.value||"post";
-  const theme=document.getElementById("shareTheme")?.value||"dark";
+  const theme=document.getElementById("shareTheme")?.value||"signature";
   const purchase=document.getElementById("sharePurchase")?.checked;
   const brand=document.getElementById("shareBrand")?.checked!==false;
-  canvas.width=1080;canvas.height=format==="story"?1920:1350;
-  const ctx=canvas.getContext("2d"),W=canvas.width,H=canvas.height;
+  const showPlate=document.getElementById("sharePlate")?.checked!==false;
+  const showVin=document.getElementById("shareVin")?.checked;
+  const showMods=document.getElementById("shareMods")?.checked!==false;
+
+  const sizes={post:[1080,1350],story:[1080,1920],wallpaper:[2560,1440],a4:[2480,3508],a3:[3508,4961]};
+  const [W,H]=sizes[format]||sizes.post;canvas.width=W;canvas.height=H;
+  const ctx=canvas.getContext("2d"),S=W/1080,portrait=H/W>1.15,wall=format==="wallpaper";
   const themes={
-    dark:{bg:"#0b0d10",panel:"#15181d",text:"#ffffff",sub:"#a8adb7",accent:"#e33434"},
-    performance:{bg:"#080808",panel:"#121212",text:"#ffffff",sub:"#b6b6b6",accent:"#ff3030"},
-    minimal:{bg:"#f3f1ec",panel:"#ffffff",text:"#111111",sub:"#666666",accent:"#222222"}
-  },t=themes[theme];
+    signature:{bg:"#07090c",panel:"#11151a",text:"#ffffff",sub:"#929aa6",accent:"#e52b31"},
+    dark:{bg:"#090b0e",panel:"#14181d",text:"#ffffff",sub:"#9ba2ad",accent:"#d93035"},
+    performance:{bg:"#050506",panel:"#111113",text:"#ffffff",sub:"#b7b7ba",accent:"#ff2f35"},
+    blueprint:{bg:"#081019",panel:"#0d1925",text:"#edf7ff",sub:"#85a5bf",accent:"#62b8ff"},
+    street:{bg:"#0a0909",panel:"#171414",text:"#fff8f2",sub:"#b8aaa1",accent:"#ff493b"},
+    minimal:{bg:"#f2f0eb",panel:"#ffffff",text:"#111111",sub:"#6d6a66",accent:"#e02d31"}
+  },t=themes[theme]||themes.signature;
+
+  // background
   ctx.fillStyle=t.bg;ctx.fillRect(0,0,W,H);
-  if(theme==="performance"){ctx.fillStyle=t.accent;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(330,0);ctx.lineTo(0,330);ctx.fill()}
-  const pad=70, imageY=format==="story"?180:80, imageH=format==="story"?780:600;
-  roundedRect(ctx,pad,imageY,W-pad*2,imageH,34);ctx.save();ctx.clip();
+  if(theme==="blueprint"){
+    ctx.strokeStyle="rgba(98,184,255,.09)";ctx.lineWidth=Math.max(1,S);
+    const grid=54*S;for(let x=0;x<W;x+=grid){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
+    for(let y=0;y<H;y+=grid){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+  }
+  if(["signature","performance","street"].includes(theme)){
+    ctx.fillStyle=t.accent;ctx.save();ctx.globalAlpha=.95;
+    ctx.beginPath();ctx.moveTo(W*.76,0);ctx.lineTo(W,0);ctx.lineTo(W*.88,H*.16);ctx.lineTo(W*.68,H*.16);ctx.closePath();ctx.fill();ctx.restore();
+  }
+
+  const pad=(wall?72:70)*S;
+  const imageX=pad, imageY=(wall?160:portrait?145:120)*S;
+  const imageW=wall?W*.57:W-pad*2;
+  const imageH=wall?H-imageY-pad:Math.min(H*.43,780*S);
+  roundedRect(ctx,imageX,imageY,imageW,imageH,32*S);ctx.save();ctx.clip();
   const img=await loadShareImage(findCarImage(c));
-  if(img)drawCover(ctx,img,pad,imageY,W-pad*2,imageH);
-  else{ctx.fillStyle=t.panel;ctx.fillRect(pad,imageY,W-pad*2,imageH);ctx.fillStyle=t.sub;ctx.font="700 34px Arial";ctx.textAlign="center";ctx.fillText("FAHRZEUGBILD",W/2,imageY+imageH/2)}
+  if(img)drawCover(ctx,img,imageX,imageY,imageW,imageH);
+  else{ctx.fillStyle=t.panel;ctx.fillRect(imageX,imageY,imageW,imageH);ctx.fillStyle=t.sub;ctx.font=`800 ${34*S}px Arial`;ctx.textAlign="center";ctx.fillText("JIGGY VEHICLE",imageX+imageW/2,imageY+imageH/2)}
   ctx.restore();
-  const grad=ctx.createLinearGradient(0,imageY+imageH*.5,0,imageY+imageH);grad.addColorStop(0,"rgba(0,0,0,0)");grad.addColorStop(1,"rgba(0,0,0,.72)");ctx.fillStyle=grad;ctx.fillRect(pad,imageY,W-pad*2,imageH);
-  const title=shareCarTitle(c)||"Mein Fahrzeug";ctx.textAlign="left";ctx.fillStyle="#fff";const fs=fitText(ctx,title,W-pad*2-70,58,32);ctx.font=`800 ${fs}px Arial`;ctx.fillText(title,pad+35,imageY+imageH-55);
-  let infoY=imageY+imageH+65;
-  ctx.fillStyle=t.text;ctx.font="800 30px Arial";ctx.fillText("FAHRZEUGDATEN",pad,infoY);
-  ctx.fillStyle=t.accent;ctx.fillRect(pad,infoY+18,90,6);
-  infoY+=75;
-  const rows=[
-    ["Baujahr",c.year||"—"],["Leistung",c.power?`${c.power} PS`:"—"],["Drehmoment",c.torque?`${c.torque} Nm`:"—"],
-    ["Kraftstoff",c.fuel||"—"],["Getriebe",c.gearbox||"—"]
-  ];
-  if(purchase)rows.push(["Kaufpreis",shareMoney(c.purchase)]);
-  const cols=2, gap=22, boxW=(W-pad*2-gap)/2, boxH=105;
-  rows.forEach((r,i)=>{
-    const x=pad+(i%cols)*(boxW+gap),y=infoY+Math.floor(i/cols)*(boxH+gap);
-    ctx.fillStyle=t.panel;roundedRect(ctx,x,y,boxW,boxH,20);ctx.fill();
-    ctx.fillStyle=t.sub;ctx.font="600 21px Arial";ctx.fillText(r[0].toUpperCase(),x+24,y+34);
-    ctx.fillStyle=t.text;ctx.font="800 30px Arial";ctx.fillText(String(r[1]),x+24,y+75);
-  });
-  if(brand){ctx.fillStyle=t.sub;ctx.font="600 22px Arial";ctx.textAlign="center";ctx.fillText("Made with JIGGY.",W/2,H-45)}
+
+  const grad=ctx.createLinearGradient(0,imageY+imageH*.45,0,imageY+imageH);grad.addColorStop(0,"rgba(0,0,0,0)");grad.addColorStop(1,"rgba(0,0,0,.82)");ctx.fillStyle=grad;ctx.fillRect(imageX,imageY,imageW,imageH);
+
+  // masthead
+  ctx.textAlign="left";ctx.fillStyle=t.text;ctx.font=`900 ${26*S}px Arial`;ctx.fillText("JIGGY.",pad,58*S);
+  ctx.fillStyle=t.accent;ctx.fillRect(pad,70*S,72*S,5*S);
+  ctx.fillStyle=t.sub;ctx.font=`600 ${12*S}px Arial`;ctx.fillText("YOUR CAR. YOUR STORY.",pad,94*S);
+
+  const title=shareCarTitle(c)||"Mein Fahrzeug";
+  if(wall){
+    const tx=W*.64,tw=W-tx-pad;
+    ctx.fillStyle=t.text;let f=fitText(ctx,title,tw,62*S,30*S);ctx.font=`900 ${f}px Arial`;ctx.fillText(title.toUpperCase(),tx,250*S);
+    ctx.fillStyle=t.accent;ctx.fillRect(tx,278*S,115*S,7*S);
+    const specs=[[c.power?`${c.power} PS`:"—","POWER"],[c.torque?`${c.torque} NM`:"—","TORQUE"],[c.year||"—","YEAR"]];
+    specs.forEach((s,i)=>{const y=(390+i*155)*S;ctx.fillStyle=t.sub;ctx.font=`700 ${14*S}px Arial`;ctx.fillText(s[1],tx,y);ctx.fillStyle=t.text;ctx.font=`900 ${43*S}px Arial`;ctx.fillText(String(s[0]),tx,y+48*S)});
+    if(showPlate&&c.plate){ctx.fillStyle=t.panel;roundedRect(ctx,tx,850*S,tw,78*S,14*S);ctx.fill();ctx.fillStyle=t.text;ctx.font=`800 ${26*S}px monospace`;ctx.fillText(c.plate,tx+22*S,900*S)}
+    if(showVin&&c.vin){ctx.fillStyle=t.sub;ctx.font=`600 ${12*S}px monospace`;ctx.fillText(`VIN ${c.vin}`,tx,980*S)}
+  }else{
+    ctx.fillStyle="#fff";const f=fitText(ctx,title,imageW-70*S,58*S,31*S);ctx.font=`900 ${f}px Arial`;ctx.fillText(title.toUpperCase(),imageX+34*S,imageY+imageH-50*S);
+    if(showPlate&&c.plate){ctx.fillStyle="rgba(0,0,0,.68)";roundedRect(ctx,imageX+34*S,imageY+32*S,250*S,52*S,10*S);ctx.fill();ctx.fillStyle="#fff";ctx.font=`800 ${20*S}px monospace`;ctx.fillText(c.plate,imageX+52*S,imageY+66*S)}
+  }
+
+  if(!wall){
+    let infoY=imageY+imageH+58*S;
+    ctx.fillStyle=t.text;ctx.font=`900 ${26*S}px Arial`;ctx.fillText(theme==="blueprint"?"TECHNICAL IDENTITY":"VEHICLE IDENTITY",pad,infoY);
+    ctx.fillStyle=t.accent;ctx.fillRect(pad,infoY+15*S,88*S,6*S);
+    infoY+=62*S;
+    let rows=[
+      ["Leistung",c.power?`${c.power} PS`:"—"],["Drehmoment",c.torque?`${c.torque} Nm`:"—"],
+      ["Baujahr",c.year||"—"],["Kraftstoff",c.fuel||"—"],["Getriebe",c.gearbox||"—"],
+      ["Kilometer",c.km?`${num(c.km)} km`:"—"]
+    ];
+    if(purchase)rows.push(["Kaufpreis",shareMoney(c.purchase)]);
+    if(showVin&&c.vin)rows.push(["VIN",c.vin]);
+    const cols=2,gap=18*S,boxW=(W-pad*2-gap)/2,boxH=91*S;
+    rows.forEach((r,i)=>{
+      const x=pad+(i%cols)*(boxW+gap),y=infoY+Math.floor(i/cols)*(boxH+gap);
+      ctx.fillStyle=t.panel;roundedRect(ctx,x,y,boxW,boxH,18*S);ctx.fill();
+      if(theme==="blueprint"){ctx.strokeStyle="rgba(98,184,255,.30)";ctx.lineWidth=1*S;ctx.stroke()}
+      ctx.fillStyle=t.sub;ctx.font=`700 ${14*S}px Arial`;ctx.fillText(String(r[0]).toUpperCase(),x+20*S,y+28*S);
+      ctx.fillStyle=t.text;ctx.font=`900 ${23*S}px Arial`;ctx.fillText(String(r[1]),x+20*S,y+65*S);
+    });
+
+    if(showMods){
+      const mods=(state.builds||[]).filter(x=>x.carId===c.id && (x.status==="Verbaut"||x.status==="Erledigt"||x.status==="Fertig")).slice(-3).reverse();
+      if(mods.length){
+        const y=infoY+Math.ceil(rows.length/2)*(boxH+gap)+24*S;
+        if(y<H-135*S){
+          ctx.fillStyle=t.sub;ctx.font=`700 ${13*S}px Arial`;ctx.fillText("JIGGY BUILD",pad,y);
+          ctx.fillStyle=t.text;ctx.font=`800 ${19*S}px Arial`;
+          mods.forEach((m,i)=>ctx.fillText(`/ ${m.name}`,pad,y+(31+i*28)*S));
+        }
+      }
+    }
+  }
+  if(brand){
+    ctx.fillStyle=t.sub;ctx.font=`700 ${14*S}px Arial`;ctx.textAlign=wall?"left":"center";
+    ctx.fillText("Made with JIGGY.  ·  Your car. Your story.",wall?pad:W/2,H-38*S);
+  }
 }
 function openShareCard(carId){
   shareCarId=carId||state.activeCarId;const m=document.getElementById("shareModal");if(!m)return;m.classList.add("open");m.setAttribute("aria-hidden","false");renderShareCard();
@@ -458,7 +592,7 @@ function ensureShareButtons(){
     if(card.querySelector(".share-car-btn"))return;
     const id=card.dataset.id||card.getAttribute("data-car-id");
     if(!id)return;
-    const b=document.createElement("button");b.type="button";b.className="btn ghost share-car-btn";b.textContent="Share Card";b.addEventListener("click",e=>{e.stopPropagation();openShareCard(id)});card.appendChild(b);
+    const b=document.createElement("button");b.type="button";b.className="btn ghost share-car-btn";b.textContent="Poster Studio";b.addEventListener("click",e=>{e.stopPropagation();openShareCard(id)});card.appendChild(b);
   });
 }
 document.addEventListener("click",e=>{
@@ -467,7 +601,7 @@ document.addEventListener("click",e=>{
   if(e.target?.id==="shareNative")nativeShareCard();
   if(e.target?.id==="shareModal")closeShareCard();
 });
-document.addEventListener("change",e=>{if(["shareFormat","shareTheme","sharePurchase","shareBrand"].includes(e.target?.id))renderShareCard()});
+document.addEventListener("change",e=>{if(["shareFormat","shareTheme","sharePlate","shareVin","shareMods","sharePurchase","shareBrand"].includes(e.target?.id))renderShareCard()});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeShareCard()});
 const shareObserver=new MutationObserver(()=>ensureShareButtons());
 document.addEventListener("DOMContentLoaded",()=>{ensureShareButtons();const root=document.getElementById("cars")||document.body;shareObserver.observe(root,{childList:true,subtree:true})});
@@ -490,7 +624,7 @@ function ensureDashboardShareButton(){
   btn.id="dashboardShareBtn";
   btn.type="button";
   btn.className="btn ghost";
-  btn.textContent="↗ Share Card";
+  btn.textContent="↗ Poster Studio";
   btn.addEventListener("click", e=>{
     e.preventDefault();
     e.stopPropagation();

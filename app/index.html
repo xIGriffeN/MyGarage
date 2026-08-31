@@ -9,7 +9,7 @@
 <body>
   <aside class="sidebar" id="sidebar">
     <div class="brand">
-      <div class="brand-mark">J</div>
+      <div class="brand-mark brand-mark-new"><span>J</span><i></i></div>
       <div class="brand-copy"><strong>JIGGY</strong><span>Your car. Your story.</span></div>
     </div>
 
@@ -41,6 +41,12 @@
           <span class="pill">Aktives Fahrzeug</span>
           <h2 id="homeCarName">Noch kein Fahrzeug</h2>
           <p id="homeCarInfo">Lege dein erstes Fahrzeug an.</p>
+
+          <div class="hero-identity" id="heroIdentity">
+            <span><small>VIN</small><b id="heroVin">—</b></span>
+            <span><small>Motor</small><b id="heroEngine">—</b></span>
+            <span><small>Antrieb</small><b id="heroDrive">—</b></span>
+          </div>
           <div class="hero-actions">
             <button class="primary" data-go="cars">Fahrzeug verwalten</button>
             <button class="secondary" data-go="service">Service eintragen</button>
@@ -96,7 +102,7 @@
     <div class="card app-update-card">
   <div class="card-head"><div>
     <h3>JIGGY Update</h3>
-    <p class="muted">Installierte Version: <strong id="appVersion">1.5.1</strong></p>
+    <p class="muted">Installierte Version: <strong id="appVersion">1.6.0</strong></p>
   </div></div>
   <button class="btn" id="checkUpdatesBtn" type="button">Nach Updates suchen</button>
   <p class="muted small" id="updateStatus">Updates werden auch automatisch beim Start geprüft.</p>
@@ -105,8 +111,25 @@
     <section id="carsView" class="view">
       <div class="section-grid">
         <div class="card">
-          <div class="card-head"><h3>Fahrzeug hinzufügen</h3><span>Nur das Wichtigste</span></div>
+          <div class="card-head"><div><span class="feature-kicker">GARAGE SETUP</span><h3>Fahrzeug hinzufügen</h3></div><span>VIN oder Datenbank</span></div>
           <form id="carForm" autocomplete="off">
+
+            <div class="vin-panel">
+              <div class="vin-panel-head">
+                <div>
+                  <span class="feature-kicker">JIGGY IDENTITY</span>
+                  <strong>Fahrzeug per VIN erkennen</strong>
+                  <small>17-stellige Fahrgestellnummer eingeben. Gefundene Daten kannst du danach noch ändern.</small>
+                </div>
+                <span class="vin-chip">VIN</span>
+              </div>
+              <div class="vin-row">
+                <input id="carVin" maxlength="17" spellcheck="false" autocomplete="off" placeholder="z. B. WAUZZZF40MA123456">
+                <button type="button" class="primary vin-decode-btn" id="decodeVinBtn">VIN decodieren</button>
+              </div>
+              <div id="vinDecodeStatus" class="vin-status">Noch keine VIN geprüft.</div>
+              <div id="vinDecodeFacts" class="vin-facts"></div>
+            </div>
             <div class="smart-search-wrap">
               <label>Fahrzeug suchen
                 <input id="vehicleSearch" placeholder="z. B. Audi S4, BMW M3, Golf 8 GTI ...">
@@ -322,8 +345,8 @@
   <div class="share-modal-panel">
     <div class="share-modal-head">
       <div>
-        <h2>Share Card</h2>
-        <p class="muted">Erstelle eine Grafik von deinem Fahrzeug.</p>
+        <span class="feature-kicker">JIGGY STUDIO</span><h2>Poster & Share Studio</h2>
+        <p class="muted">Social Card, Wallpaper oder druckbares Fahrzeugposter.</p>
       </div>
       <button class="share-close" id="shareClose" type="button" aria-label="Schließen">×</button>
     </div>
@@ -333,17 +356,26 @@
           <select id="shareFormat">
             <option value="post">Instagram Post · 1080 × 1350</option>
             <option value="story">Instagram Story · 1080 × 1920</option>
+            <option value="wallpaper">Wallpaper · 2560 × 1440</option>
+            <option value="a4">A4 Poster · 2480 × 3508</option>
+            <option value="a3">A3 Poster · 3508 × 4961</option>
           </select>
         </label>
         <label>Design
           <select id="shareTheme">
-            <option value="dark">Clean Dark</option>
+            <option value="signature">JIGGY Signature</option>
             <option value="performance">Performance</option>
+            <option value="blueprint">Blueprint</option>
+            <option value="street">Street</option>
+            <option value="dark">Clean Dark</option>
             <option value="minimal">Minimal</option>
           </select>
         </label>
+        <label class="share-check"><input type="checkbox" id="sharePlate" checked> Kennzeichen anzeigen</label>
+        <label class="share-check"><input type="checkbox" id="shareVin"> VIN anzeigen</label>
+        <label class="share-check"><input type="checkbox" id="shareMods" checked> Umbauten hervorheben</label>
         <label class="share-check"><input type="checkbox" id="sharePurchase"> Kaufpreis anzeigen</label>
-        <label class="share-check"><input type="checkbox" id="shareBrand" checked> „Made with JIGGY“ anzeigen</label>
+        <label class="share-check"><input type="checkbox" id="shareBrand" checked> JIGGY Branding anzeigen</label>
         <button class="btn" id="shareDownload" type="button">Bild speichern</button>
         <button class="btn ghost" id="shareNative" type="button">Teilen</button>
       </div>

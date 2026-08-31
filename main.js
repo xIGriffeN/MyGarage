@@ -58,6 +58,65 @@ function stripHtml(value = "") {
   return String(value).replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
 }
 
+
+ipcMain.handle("vehicle:decode-vin", async (_event, payload = {}) => {
+  const vin = String(payload.vin || "").trim().toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g, "").slice(0, 17);
+  const modelYear = String(payload.modelYear || "").trim().slice(0, 4);
+  if (vin.length !== 17) return { ok: false, error: "Eine VIN muss genau 17 Zeichen haben." };
+
+  try {
+    const params = new URLSearchParams({ format: "json" });
+    if (/^\d{4}$/.test(modelYear)) params.set("modelyear", modelYear);
+    const url = `https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValuesExtended/${encodeURIComponent(vin)}?${params.toString()}`;
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "JIGGY/1.6.0 VIN Decoder",
+        "Accept": "application/json"
+      }
+    });
+    if (!response.ok) throw new Error(`VIN-Service HTTP ${response.status}`);
+    const data = await response.json();
+    const r = data?.Results?.[0] || {};
+
+    const errorCode = String(r.ErrorCode || "").split(",").map(x => x.trim()).filter(Boolean);
+    const hasHardError = errorCode.some(x => !["0","10","11","14"].includes(x));
+    const make = r.Make || "";
+    const model = r.Model || "";
+    const year = Number(r.ModelYear || modelYear || 0) || 0;
+
+    if (!make && !model && hasHardError) {
+      return { ok: false, error: r.ErrorText || "Die VIN konnte nicht eindeutig decodiert werden." };
+    }
+
+    const engineLiters = r.DisplacementL || "";
+    const cylinders = r.EngineCylinders || "";
+    const engineModel = r.EngineModel || r.EngineConfiguration || "";
+    const fuel = r.FuelTypePrimary || r.FuelTypeSecondary || "";
+    const body = r.BodyClass || "";
+    const drive = r.DriveType || "";
+    const plantCountry = r.PlantCountry || "";
+    const plantCity = r.PlantCity || "";
+    const series = r.Series || r.Trim || "";
+    const doors = r.Doors || "";
+    const manufacturer = r.Manufacturer || "";
+    const vehicleType = r.VehicleType || "";
+
+    return {
+      ok: true,
+      vin,
+      rawError: r.ErrorText || "",
+      data: {
+        make, model, year, series, fuel, body, drive,
+        engineLiters, cylinders, engineModel,
+        plantCountry, plantCity, doors, manufacturer, vehicleType
+      }
+    };
+  } catch (err) {
+    console.log("VIN decode:", err.message);
+    return { ok: false, error: "VIN-Abfrage fehlgeschlagen: " + err.message };
+  }
+});
+
 ipcMain.handle("vehicle:example-image", async (_event, payload = {}) => {
   const rawQuery = String(payload.query || "").trim().slice(0, 140);
   const skip = Math.max(0, Math.min(Number(payload.skip) || 0, 12));
@@ -109,7 +168,7 @@ ipcMain.handle("vehicle:example-image", async (_event, payload = {}) => {
 
       const response = await fetch(`https://commons.wikimedia.org/w/api.php?${params.toString()}`, {
         headers: {
-          "User-Agent": "JIGGY/1.5.1 (vehicle example image cache)",
+          "User-Agent": "JIGGY/1.6.0 (vehicle example image cache)",
           "Accept": "application/json"
         }
       });
@@ -154,7 +213,7 @@ ipcMain.handle("vehicle:example-image", async (_event, payload = {}) => {
     const ii = page.imageinfo[0];
     const imageUrl = ii.thumburl || ii.url;
     const imageResponse = await fetch(imageUrl, {
-      headers: { "User-Agent": "JIGGY/1.5.1 vehicle-image-cache" }
+      headers: { "User-Agent": "JIGGY/1.6.0 vehicle-image-cache" }
     });
     if (!imageResponse.ok) throw new Error(`Bilddownload HTTP ${imageResponse.status}`);
 

@@ -111,3 +111,9 @@ JIGGY 1.5.1
 - Beispielbilder repariert: Bilder werden jetzt von der Desktop-App geladen, lokal gecacht und über ein internes jiggy-image-Protokoll angezeigt.
 - Robustere Wikimedia-Suche mit mehreren Suchstufen.
 - Alte Remote-Beispielbilder werden automatisch in den lokalen Cache überführt.
+
+
+JIGGY 1.6.0
+------------
+Feature-Release: VIN-Decoder, neues Identity-UI und Poster Studio.
+Technische Identität bleibt de.mygarage.app / xIGriffeN/MyGarage.
