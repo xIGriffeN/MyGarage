@@ -1,0 +1,15 @@
+JIGGY 1.9.4 TEST BUILD
+
+- JIGGY Cloud is now built in: https://api.jiggy-cloud.org
+- Public Profile no longer asks users for Supabase URL/key or cloud setup.
+- Create/update/delete public profiles via the self-hosted JIGGY API.
+- Edit token remains stored locally and is never part of the public profile link.
+- Public GitHub Pages profile now reads from JIGGY Cloud API.
+- Removed Cloud Admin setup UI from the normal app.
+- Poster Studio Clean layout: removed duplicate vehicle title.
+- Story uses a taller vehicle image (~68%) and a compact readable lower data area.
+- 4:5 Clean layout uses its own proportions, larger specs and readable mods.
+- TÜV/ABE editing and all 1.9.3 features retained.
+
+IMPORTANT FOR TESTING
+The current server API must allow requests from the Electron app and GitHub Pages (CORS). If browser requests are blocked, enable CORS on api.jiggy-cloud.org before testing Public Profile.

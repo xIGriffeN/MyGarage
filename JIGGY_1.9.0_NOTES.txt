@@ -1,0 +1,10 @@
+JIGGY 1.9.0 — Poster Studio 2.0 + TÜV/ABE Edit
+
+- Version auf 1.9.0 gesetzt.
+- Poster-Studio visuell aufgewertet: hochwertigere Einstiegsschaltfläche,
+  Template-Karten, Format-Steuerung und Preview.
+- Grundlage für Instagram-orientierte Poster-Ausgabe verbessert.
+- TÜV/HU- und ABE-Einträge erhalten Edit-Unterstützung über die vorhandenen Formulare.
+- Bestehende 1.8.4-Funktionen bleiben erhalten.
+
+Vor Release lokal testen, insbesondere bestehende TÜV/ABE-Datensätze und Poster-Export.

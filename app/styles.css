@@ -450,3 +450,102 @@ linear-gradient(45deg,#0b0e12 25%,#0e1217 25%,#0e1217 50%,#0b0e12 50%,#0b0e12 75
 
 /* JIGGY 1.8.2 */
 .hu-overdue{color:#ff4d5a!important}
+
+
+/* === JIGGY 1.9.0 — Poster Studio 2.0 === */
+[data-view="poster"], .poster-studio, #posterStudio { --poster-accent:#ed2634; }
+[data-view="poster"] .btn, .poster-studio .btn, #posterStudio .btn,
+button[data-view="poster"]{
+  border-radius:14px;
+}
+button[data-view="poster"]{
+  position:relative; overflow:hidden;
+  border:1px solid rgba(237,38,52,.34)!important;
+  background:linear-gradient(135deg,rgba(237,38,52,.20),rgba(255,255,255,.035))!important;
+  box-shadow:0 10px 28px rgba(0,0,0,.24), inset 0 1px rgba(255,255,255,.05);
+}
+button[data-view="poster"]::after{
+  content:"↗"; margin-left:auto; opacity:.75; font-size:16px;
+}
+.poster-template, .poster-theme, [data-poster-theme], [data-poster-template]{
+  border-radius:18px!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  background:linear-gradient(160deg,rgba(255,255,255,.055),rgba(255,255,255,.018))!important;
+  box-shadow:0 14px 34px rgba(0,0,0,.24);
+  transition:.18s ease;
+}
+.poster-template:hover, .poster-theme:hover, [data-poster-theme]:hover, [data-poster-template]:hover{
+  transform:translateY(-2px);
+  border-color:rgba(237,38,52,.48)!important;
+}
+.poster-preview, #posterPreview{
+  border-radius:22px!important;
+  overflow:hidden;
+  box-shadow:0 24px 70px rgba(0,0,0,.42);
+}
+.poster-format-grid button, [data-poster-format]{
+  min-height:44px; border-radius:12px!important;
+}
+
+/* JIGGY 1.9.0 legal edit actions */
+.legal-edit-btn,.tuev-edit-btn,.abe-edit-btn,[data-edit-tuev],[data-edit-abe]{
+  border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.05);
+  color:#fff; border-radius:10px; padding:8px 12px; cursor:pointer;
+}
+
+
+/* === JIGGY 1.9.1 Poster Studio real redesign === */
+.poster-control-label{display:block;font-size:.9rem;margin-bottom:8px;color:#c7ccd3;font-weight:700}
+.poster-theme-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.poster-theme-card{
+  appearance:none;text-align:left;background:#101318;border:1px solid #292f38;color:#fff;
+  border-radius:14px;padding:8px;cursor:pointer;transition:.16s ease;min-width:0
+}
+.poster-theme-card:hover{transform:translateY(-1px);border-color:#454d59}
+.poster-theme-card.active{border-color:#e52b36;box-shadow:0 0 0 1px rgba(229,43,54,.22),0 10px 25px rgba(0,0,0,.26)}
+.poster-theme-card b,.poster-theme-card small{display:block}
+.poster-theme-card b{font-size:.78rem;margin-top:7px}
+.poster-theme-card small{font-size:.66rem;color:#8f97a2;margin-top:2px}
+.poster-theme-thumb{display:block;height:58px;border-radius:9px;position:relative;overflow:hidden}
+.poster-theme-thumb::before,.poster-theme-thumb::after{content:"";position:absolute}
+.poster-theme-thumb.editorial{background:#eeeae1}
+.poster-theme-thumb.editorial::before{inset:9px 8px 19px;background:#282b2f}
+.poster-theme-thumb.editorial::after{left:8px;right:24px;bottom:8px;height:5px;background:#e32636}
+.poster-theme-thumb.night{background:linear-gradient(145deg,#050608,#15191f)}
+.poster-theme-thumb.night::before{left:0;top:0;bottom:0;width:5px;background:#ed2939}
+.poster-theme-thumb.night::after{left:15px;right:12px;bottom:11px;height:16px;border-top:3px solid #fff;border-bottom:1px solid #626a75}
+.poster-theme-thumb.motorsport{background:#090a0c}
+.poster-theme-thumb.motorsport::before{left:0;right:0;top:0;height:7px;background:#ff2939}
+.poster-theme-thumb.motorsport::after{left:11px;top:19px;width:36px;height:26px;border:2px solid #515963;box-shadow:44px 0 0 -1px #15171b}
+.poster-theme-thumb.blueprint{background-color:#07111a;background-image:linear-gradient(rgba(88,185,255,.18) 1px,transparent 1px),linear-gradient(90deg,rgba(88,185,255,.18) 1px,transparent 1px);background-size:12px 12px}
+.poster-theme-thumb.street{background:#0c0a0a}
+.poster-theme-thumb.street::before{width:80px;height:20px;background:#ff4936;right:-13px;top:8px;transform:rotate(-14deg)}
+.poster-theme-thumb.street::after{left:10px;right:12px;bottom:10px;height:18px;border-top:4px solid #fff}
+.poster-theme-thumb.minimal{background:#f7f6f2}
+.poster-theme-thumb.minimal::before{left:9px;right:9px;top:12px;height:25px;background:#d7d5cf}
+.poster-theme-thumb.minimal::after{left:9px;width:42px;bottom:9px;height:3px;background:#191a1d}
+.legal-form-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+#legalCancelEdit{min-width:110px}
+.item-actions .mini+.mini{margin-left:6px}
+
+/* === JIGGY 1.9.2 Social Car Creator === */
+.poster-theme-grid-3{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.poster-theme-grid-3 .poster-theme-card{padding:9px}
+.poster-theme-grid-3 .poster-theme-thumb{height:74px}
+.poster-theme-thumb.clean{background:#f1efe9}
+.poster-theme-thumb.clean::before{left:8px;right:8px;top:9px;height:43px;background:linear-gradient(150deg,#c9c8c4,#4e5156)}
+.poster-theme-thumb.clean::after{left:8px;bottom:8px;width:44px;height:4px;background:#e12636}
+.poster-theme-thumb.performance{background:linear-gradient(145deg,#050608,#1c2026)}
+.poster-theme-thumb.performance::before{left:0;top:0;bottom:0;width:5px;background:#ed2636}
+.poster-theme-thumb.performance::after{left:13px;right:10px;bottom:10px;height:20px;border-top:5px solid #f3f4f5;border-bottom:2px solid #ed2636}
+.poster-theme-thumb.story{background:linear-gradient(#14171c,#050608)}
+.poster-theme-thumb.story::before{left:25%;right:25%;top:6px;bottom:6px;border:2px solid #4d535d;border-radius:7px}
+.poster-theme-thumb.story::after{left:32%;right:32%;bottom:15px;height:5px;background:#ed2636}
+@media(max-width:1100px){.poster-theme-grid-3{grid-template-columns:1fr}}
+
+/* JIGGY 1.9.3 Poster Studio Pro */
+.poster-pro-controls{margin-top:14px;padding:13px;border:1px solid #292f38;border-radius:14px;background:#0e1116}
+.poster-pro-controls label{display:grid;grid-template-columns:82px 1fr;gap:10px;align-items:center;margin:9px 0;font-size:.72rem;color:#aeb5bf}
+.poster-pro-controls input[type=range]{width:100%;accent-color:#ed2636}
+.poster-accent-row input[type=color]{width:44px;height:30px;padding:2px;border:1px solid #353c46;background:#0a0c10;border-radius:8px}
+#shareCanvas{max-height:76vh;object-fit:contain}

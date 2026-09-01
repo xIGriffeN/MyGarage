@@ -1,0 +1,7 @@
+JIGGY 1.9.2 — Social Car Creator
+- Poster Studio bewusst auf drei hochwertige Designs reduziert.
+- JIGGY Clean: heller Premium/OEM-Look, großer Fahrzeugfokus.
+- JIGGY Performance: dunkler Performance-Look mit echten verbauten Mods.
+- JIGGY Story: eigenes 9:16-Layout mit Instagram-Safe-Zones.
+- Instagram Post ist jetzt 1080x1350 (4:5), statt quadratisch.
+- TÜV/ABE-Bearbeitung aus 1.9.1 bleibt erhalten.

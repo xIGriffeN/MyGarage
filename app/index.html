@@ -241,7 +241,7 @@
               <label>Status<select id="legalStatus"><option>Serie</option><option>ABE vorhanden</option><option>ECE</option><option>Eingetragen</option><option>Eintragung nötig</option><option>Teilegutachten</option><option>Unbekannt</option></select></label>
             </div>
             <label>Prüfbericht / Nummer / Hinweis<input id="legalNumber" placeholder="Optional"></label>
-            <button class="primary" type="submit">TÜV / ABE speichern</button>
+            <div class="legal-form-actions"><button class="primary" id="legalSubmitBtn" type="submit">TÜV / ABE speichern</button><button class="btn ghost" id="legalCancelEdit" type="button" hidden>Abbrechen</button></div>
           </form>
         </div>
         <div class="card">
@@ -469,35 +469,10 @@
           <button id="exportBtn">Backup exportieren</button>
           <label class="file-button">Backup importieren<input id="importFile" type="file" accept="application/json"></label>
           <button id="resetBtn" class="danger">Alle Daten löschen</button>
-          <button id="cloudAdminBtn" type="button">JIGGY Cloud Admin 🔒</button>
         </div>
       </div>
     </section>
   </main><div id="toastHost" class="toast-host"></div>
-
-<div id="cloudAdminModal" class="cloud-admin-modal" aria-hidden="true">
-  <div class="cloud-admin-panel">
-    <div class="cloud-admin-head">
-      <div><span class="feature-kicker">JIGGY SYSTEM</span><h3>Cloud Admin</h3></div>
-      <button id="cloudAdminClose" class="cloud-admin-close" type="button" aria-label="Schließen">×</button>
-    </div>
-    <div id="cloudAdminPinStep" class="cloud-admin-step">
-      <p class="muted">Geschützter Bereich. PIN eingeben.</p>
-      <label>Admin-PIN<input id="cloudAdminPin" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="••••"></label>
-      <div id="cloudAdminPinError" class="cloud-admin-error"></div>
-      <button id="cloudAdminUnlock" class="primary" type="button">Entsperren</button>
-    </div>
-    <div id="cloudAdminConfigStep" class="cloud-admin-step" hidden>
-      <label>Supabase Project URL<input id="cloudAdminUrl" type="url" placeholder="https://…supabase.co"></label>
-      <label>Supabase Publishable Key<input id="cloudAdminKey" type="password" autocomplete="off" placeholder="sb_publishable_…"></label>
-      <label>Öffentliche Profil-URL<input id="cloudAdminBase" type="url" placeholder="https://…github.io/…/"></label>
-      <div class="cloud-admin-actions">
-        <button id="cloudAdminSave" class="primary" type="button">Speichern</button>
-        <button id="cloudAdminCancel" class="secondary" type="button">Abbrechen</button>
-      </div>
-    </div>
-  </div>
-</div>
 
 <script src="vehicle-db.js"></script>
 <script src="app.js"></script>
@@ -527,16 +502,15 @@
             <option value="a3">A3 Poster · 3508 × 4961</option>
           </select>
         </label>
-        <label>Design
-          <select id="shareTheme">
-            <option value="signature">JIGGY Signature</option>
-            <option value="performance">Performance</option>
-            <option value="blueprint">Blueprint</option>
-            <option value="street">Street</option>
-            <option value="dark">Clean Dark</option>
-            <option value="minimal">Minimal</option>
-          </select>
-        </label>
+        <div class="poster-theme-picker">
+          <span class="poster-control-label">Social Design</span>
+          <input type="hidden" id="shareTheme" value="clean">
+          <div class="poster-theme-grid poster-theme-grid-3">
+            <button type="button" class="poster-theme-card active" data-theme="clean"><span class="poster-theme-thumb clean"></span><b>JIGGY Clean</b><small>Premium · OEM · 4:5</small></button>
+            <button type="button" class="poster-theme-card" data-theme="performance"><span class="poster-theme-thumb performance"></span><b>JIGGY Performance</b><small>Dark · Aggressiv · 4:5</small></button>
+            <button type="button" class="poster-theme-card" data-theme="story"><span class="poster-theme-thumb story"></span><b>JIGGY Story</b><small>Instagram · 9:16</small></button>
+          </div>
+        </div>
         <label class="share-check"><input type="checkbox" id="sharePlate" checked> Kennzeichen anzeigen</label>
         <label class="share-check"><input type="checkbox" id="shareVin"> VIN anzeigen</label>
         <label class="share-check"><input type="checkbox" id="shareMods" checked> Umbauten hervorheben</label>

@@ -1,11 +1,10 @@
-const cfg=window.JIGGY_PUBLIC_CONFIG||{},root=document.getElementById("app");
+const API_URL="https://api.jiggy-cloud.org",root=document.getElementById("app");
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 function fail(msg){root.innerHTML=`<div class="error"><b>JIGGY.</b><h2>Profil nicht verfügbar</h2><p>${esc(msg)}</p></div>`}
 const fmtDate=d=>{try{return new Date(d).toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"})}catch{return""}};
 async function run(){
- const slug=new URLSearchParams(location.search).get("id");if(!slug)return fail("Im Link fehlt die Profil-ID.");
- if(!cfg.supabaseUrl||!cfg.anonKey||cfg.supabaseUrl.includes("DEIN-PROJEKT"))return fail("Das öffentliche Profil wurde noch nicht mit Supabase verbunden.");
- try{const r=await fetch(`${cfg.supabaseUrl.replace(/\/$/,"")}/rest/v1/vehicle_profiles?slug=eq.${encodeURIComponent(slug)}&select=payload,updated_at&limit=1`,{headers:{apikey:cfg.anonKey,Authorization:`Bearer ${cfg.anonKey}`}});if(!r.ok)throw new Error(`HTTP ${r.status}`);const rows=await r.json();if(!rows.length)return fail("Dieses Profil ist offline oder wurde gelöscht.");render(rows[0].payload||{},rows[0].updated_at,slug)}catch(e){fail("Das Profil konnte gerade nicht geladen werden.")}
+ const id=new URLSearchParams(location.search).get("id");if(!id)return fail("Im Link fehlt die Profil-ID.");
+ try{const r=await fetch(`${API_URL}/api/profiles/${encodeURIComponent(id)}`);if(r.status===404)return fail("Dieses Profil ist offline oder wurde gelöscht.");if(!r.ok)throw new Error(`HTTP ${r.status}`);const row=await r.json();render(row.profile||{},row.updatedAt,id)}catch(e){fail("Das Profil konnte gerade nicht geladen werden.")}
 }
 function render(p,updated,slug){
  const c=p.car||{},s=c.specs||{},mods=Array.isArray(p.mods)?p.mods:[],theme=esc(p.theme||"signature");

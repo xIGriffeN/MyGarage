@@ -299,20 +299,59 @@ $("serviceForm").onsubmit=e=>{
   let c=car(id);if(c&&+$("serviceKm").value>+c.km)c.km=+$("serviceKm").value;
   save();e.target.reset();$("serviceDate").value=today();toast("Service gespeichert");render()
 };
+let editingLegalId=null;
 function syncLegalType(){const hu=$("legalType")?.value==="HU";if($("huFields"))$("huFields").hidden=!hu;if($("abeFields"))$("abeFields").hidden=hu}
 $("legalType")?.addEventListener("change",syncLegalType);syncLegalType();
+function resetLegalEditor(){
+  editingLegalId=null;
+  $("legalForm")?.reset();
+  if($("legalDate"))$("legalDate").value=today();
+  if($("legalSubmitBtn"))$("legalSubmitBtn").textContent="TÜV / ABE speichern";
+  if($("legalCancelEdit"))$("legalCancelEdit").hidden=true;
+  if($("legalType"))$("legalType").disabled=false;
+  syncLegalType();
+}
+function editLegal(id){
+  const x=state.legal.find(v=>v.id===id);if(!x)return;
+  editingLegalId=id;
+  $("legalCar").value=x.carId||state.activeCarId||"";
+  $("legalType").value=x.type==="HU"?"HU":"ABE";
+  $("legalType").disabled=true;
+  syncLegalType();
+  if(x.type==="HU"){
+    $("legalDate").value=x.date||today();
+    $("legalKm").value=x.km||"";
+    $("legalHuResult").value=x.result||x.status||"Bestanden";
+    $("legalNextDate").value=x.nextDate||"";
+    $("legalNumber").value=x.number||"";
+  }else{
+    $("legalPart").value=x.part||"";
+    $("legalStatus").value=x.status||"ABE vorhanden";
+    $("legalNumber").value=x.number||"";
+  }
+  if($("legalSubmitBtn"))$("legalSubmitBtn").textContent="Änderungen speichern";
+  if($("legalCancelEdit"))$("legalCancelEdit").hidden=false;
+  $("legalForm")?.scrollIntoView({behavior:"smooth",block:"center"});
+}
+window.editLegal=editLegal;
+$("legalCancelEdit")?.addEventListener("click",resetLegalEditor);
+
 $("legalForm").onsubmit=e=>{
   e.preventDefault();if(!state.cars.length)return alert("Bitte zuerst ein Fahrzeug anlegen.");
   const type=$("legalType")?.value||"ABE",carId=$("legalCar").value;
+  let entry=editingLegalId?state.legal.find(x=>x.id===editingLegalId):null;
   if(type==="HU"){
     const km=+$("legalKm").value||0;
-    state.legal.push({id:uid(),carId,type:"HU",part:"TÜV / HU",date:$("legalDate").value||today(),km,result:$("legalHuResult").value,nextDate:$("legalNextDate").value,number:$("legalNumber").value.trim(),status:$("legalHuResult").value});
+    const data={carId,type:"HU",part:"TÜV / HU",date:$("legalDate").value||today(),km,result:$("legalHuResult").value,nextDate:$("legalNextDate").value,number:$("legalNumber").value.trim(),status:$("legalHuResult").value};
+    if(entry)Object.assign(entry,data);else state.legal.push({id:uid(),...data});
     const c=car(carId);if(c&&km>+c.km)c.km=km;
   }else{
     const part=$("legalPart").value.trim();if(!part)return toast("Bitte Teil / Umbau eintragen","warn");
-    state.legal.push({id:uid(),carId,type:"ABE",part,status:$("legalStatus").value,number:$("legalNumber").value.trim()});
+    const data={carId,type:"ABE",part,status:$("legalStatus").value,number:$("legalNumber").value.trim()};
+    if(entry)Object.assign(entry,data);else state.legal.push({id:uid(),...data});
   }
-  save();e.target.reset();$("legalDate").value=today();syncLegalType();toast(type==="HU"?"TÜV / HU gespeichert":"ABE / Eintragung gespeichert");render()
+  const wasEdit=!!entry;
+  save();resetLegalEditor();toast(wasEdit?"Eintrag aktualisiert":(type==="HU"?"TÜV / HU gespeichert":"ABE / Eintragung gespeichert"));render()
 };
 $("fuelForm").onsubmit=async e=>{
   e.preventDefault();if(!state.cars.length)return alert("Bitte zuerst ein Fahrzeug anlegen.");
@@ -487,7 +526,7 @@ function renderLists(){
 
   $("serviceList").innerHTML=state.service.filter(x=>c&&x.carId===c.id).sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(x=>item(x.type,[x.date,`${num(x.km)} km`,money(x.cost),x.note].filter(Boolean).join(" · "),"",`<button class="mini danger" onclick="del('service','${x.id}')">Löschen</button>`)).join("")||'<div class="empty">Noch keine Service-Einträge.</div>';
 
-  $("legalList").innerHTML=state.legal.filter(x=>c&&x.carId===c.id).map(x=>{if(x.type==="HU"){const cls=/^Bestanden/.test(x.result||x.status)?"good":"bad";return item("TÜV / HU",[x.date,x.km?`${num(x.km)} km`:"",x.nextDate?`Nächste HU: ${x.nextDate}`:"",x.number].filter(Boolean).join(" · "),`<span class="status ${cls}">${esc(x.result||x.status||"—")}</span>`,`<button class="mini danger" onclick="del('legal','${x.id}')">Löschen</button>`)}let cls=/Eingetragen|ABE|ECE|Serie/.test(x.status)?"good":/nötig|Unbekannt/.test(x.status)?"bad":"warn";return item(x.part,[x.number].filter(Boolean).join(" · "),`<span class="status ${cls}">${x.status}</span>`,`<button class="mini danger" onclick="del('legal','${x.id}')">Löschen</button>`)}).join("")||'<div class="empty">Noch keine TÜV/ABE-Einträge.</div>';
+  $("legalList").innerHTML=state.legal.filter(x=>c&&x.carId===c.id).map(x=>{if(x.type==="HU"){const cls=/^Bestanden/.test(x.result||x.status)?"good":"bad";return item("TÜV / HU",[x.date,x.km?`${num(x.km)} km`:"",x.nextDate?`Nächste HU: ${x.nextDate}`:"",x.number].filter(Boolean).join(" · "),`<span class="status ${cls}">${esc(x.result||x.status||"—")}</span>`,`<button class="mini" onclick="editLegal('${x.id}')">Bearbeiten</button><button class="mini danger" onclick="del('legal','${x.id}')">Löschen</button>`)}let cls=/Eingetragen|ABE|ECE|Serie/.test(x.status)?"good":/nötig|Unbekannt/.test(x.status)?"bad":"warn";return item(x.part,[x.number].filter(Boolean).join(" · "),`<span class="status ${cls}">${x.status}</span>`,`<button class="mini" onclick="editLegal('${x.id}')">Bearbeiten</button><button class="mini danger" onclick="del('legal','${x.id}')">Löschen</button>`)}).join("")||'<div class="empty">Noch keine TÜV/ABE-Einträge.</div>';
 
   $("fuelList").innerHTML=state.fuel.filter(x=>c&&x.carId===c.id).sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(x=>item("Tankung",[x.date,`${num(x.km)} km`,`${x.liters||0} l`,money(x.cost),x.receiptFileName?`Beleg: ${esc(x.receiptFileName)}`:""].filter(Boolean).join(" · "),"",`${x.receiptFileId?`<button class="mini" onclick="openFuelReceipt('${x.id}')">Beleg</button>`:""}<button class="mini danger" onclick="del('fuel','${x.id}')">Löschen</button>`)).join("")||'<div class="empty">Noch keine Tankungen.</div>';
 
@@ -614,109 +653,37 @@ async function checkReminderNotifications(){
 }
 setTimeout(checkReminderNotifications,1800);setInterval(checkReminderNotifications,60*60*1000);
 
-/* Public Profile */
-const JIGGY_CLOUD_DEFAULTS={url:"https://wmhphdbaytzwtrlonfot.supabase.co",baseUrl:"https://xigriffen.github.io/MyGarage/"};
-function cloudConfig(){try{return {...JIGGY_CLOUD_DEFAULTS,...JSON.parse(localStorage.getItem(CLOUD_KEY)||"{}")} }catch{return {...JIGGY_CLOUD_DEFAULTS}}}
-function saveCloudConfig(v){localStorage.setItem(CLOUD_KEY,JSON.stringify(v))}
+/* Public Profile · JIGGY Cloud */
+const JIGGY_CLOUD={apiUrl:"https://api.jiggy-cloud.org",baseUrl:"https://xigriffen.github.io/MyGarage/"};
 function profileConfig(){try{return JSON.parse(localStorage.getItem(PROFILE_KEY)||"{}")}catch{return{}}}
 function saveProfileConfig(v){localStorage.setItem(PROFILE_KEY,JSON.stringify(v))}
-function randomSecret(){const a=new Uint8Array(24);crypto.getRandomValues(a);return [...a].map(x=>x.toString(16).padStart(2,"0")).join("")}
-function slugify(s){return String(s||"car").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,34)||"car"}
 async function publicImageData(c){
   const src=c&&(c.image||c.exampleImage);if(!src||!$("profileGallery")?.checked)return"";
-  try{
-    const img=new Image();img.src=src;await img.decode();const max=1100,scale=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight)),w=Math.max(1,Math.round(img.naturalWidth*scale)),h=Math.max(1,Math.round(img.naturalHeight*scale)),cv=document.createElement("canvas");cv.width=w;cv.height=h;cv.getContext("2d").drawImage(img,0,0,w,h);return cv.toDataURL("image/jpeg",.78)
-  }catch{return""}
+  try{const img=new Image();img.src=src;await img.decode();const max=1100,scale=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight)),w=Math.max(1,Math.round(img.naturalWidth*scale)),h=Math.max(1,Math.round(img.naturalHeight*scale)),cv=document.createElement("canvas");cv.width=w;cv.height=h;cv.getContext("2d").drawImage(img,0,0,w,h);return cv.toDataURL("image/jpeg",.78)}catch{return""}
 }
 function profilePayload(c,image=""){
   const mods=$("profileMods")?.checked?(state.builds||[]).filter(x=>x.carId===c.id&&x.status==="Verbaut").slice(0,20).map(x=>({name:x.name,category:x.category,date:x.date||""})):[];
-  return{
-    version:1,displayName:$("profileName")?.value.trim()||cname(c),bio:$("profileBio")?.value.trim()||"",theme:$("profileTheme")?.value||"signature",
-    car:{make:c.make,model:c.model,variant:c.variant,year:c.year,image,
-      specs:$("profileSpecs")?.checked?{power:c.power,torque:c.torque,fuel:c.fuel,gearbox:c.gearbox}:null,
-      mileage:$("profileMileage")?.checked?c.km:null,plate:$("profilePlate")?.checked?c.plate:""},
-    mods,updatedAt:new Date().toISOString()
-  };
+  return{version:2,displayName:$("profileName")?.value.trim()||cname(c),bio:$("profileBio")?.value.trim()||"",theme:$("profileTheme")?.value||"signature",car:{make:c.make,model:c.model,variant:c.variant,year:c.year,image,specs:$("profileSpecs")?.checked?{power:c.power,torque:c.torque,fuel:c.fuel,gearbox:c.gearbox}:null,mileage:$("profileMileage")?.checked?c.km:null,plate:$("profilePlate")?.checked?c.plate:""},mods,updatedAt:new Date().toISOString()};
 }
-function loadProfileInputs(){
-  const p=profileConfig(),c=car($("profileCar")?.value);if(!$("profileName"))return;
-  if(!document.activeElement||!["profileName","profileBio"].includes(document.activeElement.id)){
-    $("profileName").value=p.displayName||"";$("profileBio").value=p.bio||"";
-  }
-  if(p.theme)$("profileTheme").value=p.theme;
-  ["Specs","Mileage","Plate","Mods","Gallery"].forEach(k=>{const el=$("profile"+k);if(el&&p["show"+k]!==undefined)el.checked=!!p["show"+k]});
-}
-function localProfileSettings(){
-  return{...profileConfig(),displayName:$("profileName").value.trim(),bio:$("profileBio").value.trim(),theme:$("profileTheme").value,showSpecs:$("profileSpecs").checked,showMileage:$("profileMileage").checked,showPlate:$("profilePlate").checked,showMods:$("profileMods").checked,showGallery:$("profileGallery").checked};
-}
+function loadProfileInputs(){const p=profileConfig(),c=car($("profileCar")?.value);if(!$("profileName"))return;if(!document.activeElement||!["profileName","profileBio"].includes(document.activeElement.id)){$("profileName").value=p.displayName||"";$("profileBio").value=p.bio||""}if(p.theme)$("profileTheme").value=p.theme;["Specs","Mileage","Plate","Mods","Gallery"].forEach(k=>{const el=$("profile"+k);if(el&&p["show"+k]!==undefined)el.checked=!!p["show"+k]})}
+function localProfileSettings(){return{...profileConfig(),displayName:$("profileName").value.trim(),bio:$("profileBio").value.trim(),theme:$("profileTheme").value,showSpecs:$("profileSpecs").checked,showMileage:$("profileMileage").checked,showPlate:$("profilePlate").checked,showMods:$("profileMods").checked,showGallery:$("profileGallery").checked}}
 function renderPublicProfile(){
-  if(!$("profilePreview"))return;loadProfileInputs();const c=car($("profileCar")?.value),cfg=profileConfig();
-  if(!c){$("profilePreview").innerHTML='<div class="log-empty">Lege zuerst ein Fahrzeug an.</div>';return}
+  if(!$("profilePreview"))return;loadProfileInputs();const c=car($("profileCar")?.value),cfg=profileConfig();if(!c){$("profilePreview").innerHTML='<div class="log-empty">Lege zuerst ein Fahrzeug an.</div>';return}
   const mods=$("profileMods")?.checked?(state.builds||[]).filter(x=>x.carId===c.id&&x.status==="Verbaut").slice(0,4):[],img=$("profileGallery")?.checked?(c.image||c.exampleImage):"";
-  $("profilePreview").innerHTML=`<div class="public-preview-shell theme-${esc($("profileTheme")?.value||"signature")}">
-    <div class="public-preview-image">${img?`<img src="${img}" alt="">`:'<div class="profile-fallback">JIGGY.</div>'}<span>JIGGY PROFILE</span></div>
-    <div class="public-preview-copy"><small>YOUR CAR. YOUR STORY.</small><h2>${esc($("profileName")?.value.trim()||cname(c))}</h2><p>${esc($("profileBio")?.value.trim()||"Dieses Fahrzeug lebt in JIGGY.")}</p>
-    ${$("profileSpecs")?.checked?`<div class="public-specs"><b>${c.power||"—"}<span>PS</span></b><b>${c.torque||"—"}<span>NM</span></b><b>${c.year||"—"}<span>YEAR</span></b></div>`:""}
-    ${($("profileMileage")?.checked||$("profilePlate")?.checked)?`<div class="public-profile-details">${$("profileMileage")?.checked?`<span><small>KILOMETERSTAND</small><strong>${num(c.km)} km</strong></span>`:""}${$("profilePlate")?.checked?`<span><small>KENNZEICHEN</small><strong>${esc(c.plate||"—")}</strong></span>`:""}</div>`:""}
-    ${mods.length?`<div class="public-mods">${mods.map(x=>`<span>${esc(x.name)}</span>`).join("")}</div>`:""}</div></div>`;
-  const published=!!cfg.slug;$("profileStatusText").textContent=published?"Veröffentlicht":"Nicht veröffentlicht";$("profileStatusOrb").classList.toggle("online",published);$("copyProfileBtn").disabled=!published;$("unpublishProfileBtn").disabled=!published;
+  $("profilePreview").innerHTML=`<div class="public-preview-shell theme-${esc($("profileTheme")?.value||"signature")}"><div class="public-preview-image">${img?`<img src="${img}" alt="">`:'<div class="profile-fallback">JIGGY.</div>'}<span>JIGGY PROFILE</span></div><div class="public-preview-copy"><small>YOUR CAR. YOUR STORY.</small><h2>${esc($("profileName")?.value.trim()||cname(c))}</h2><p>${esc($("profileBio")?.value.trim()||"Dieses Fahrzeug lebt in JIGGY.")}</p>${$("profileSpecs")?.checked?`<div class="public-specs"><b>${c.power||"—"}<span>PS</span></b><b>${c.torque||"—"}<span>NM</span></b><b>${c.year||"—"}<span>YEAR</span></b></div>`:""}${($("profileMileage")?.checked||$("profilePlate")?.checked)?`<div class="public-profile-details">${$("profileMileage")?.checked?`<span><small>KILOMETERSTAND</small><strong>${num(c.km)} km</strong></span>`:""}${$("profilePlate")?.checked?`<span><small>KENNZEICHEN</small><strong>${esc(c.plate||"—")}</strong></span>`:""}</div>`:""}${mods.length?`<div class="public-mods">${mods.map(x=>`<span>${esc(x.name)}</span>`).join("")}</div>`:""}</div></div>`;
+  const published=!!cfg.profileId;$("profileStatusText").textContent=published?"Veröffentlicht":"Nicht veröffentlicht";$("profileStatusOrb").classList.toggle("online",published);$("copyProfileBtn").disabled=!published;$("unpublishProfileBtn").disabled=!published;
 }
 ["profileName","profileBio","profileTheme","profileSpecs","profileMileage","profilePlate","profileMods","profileGallery"].forEach(id=>$(id)?.addEventListener(id.includes("Name")||id.includes("Bio")?"input":"change",()=>{saveProfileConfig(localProfileSettings());renderPublicProfile()}));
 $("profileCar")?.addEventListener("change",renderPublicProfile);
-
-
-const CLOUD_ADMIN_PIN="1505";
-function openCloudAdmin(){
-  const modal=$("cloudAdminModal");if(!modal)return;
-  $("cloudAdminPinStep").hidden=false;$("cloudAdminConfigStep").hidden=true;
-  $("cloudAdminPin").value="";$("cloudAdminPinError").textContent="";
-  modal.classList.add("open");modal.setAttribute("aria-hidden","false");
-  setTimeout(()=>$("cloudAdminPin")?.focus(),40);
-}
-function closeCloudAdmin(){
-  const modal=$("cloudAdminModal");if(!modal)return;
-  modal.classList.remove("open");modal.setAttribute("aria-hidden","true");
-}
-function unlockCloudAdmin(){
-  const pin=$("cloudAdminPin")?.value||"";
-  if(pin!==CLOUD_ADMIN_PIN){$("cloudAdminPinError").textContent="Falsche PIN.";$("cloudAdminPin")?.focus();return}
-  const c=cloudConfig();
-  $("cloudAdminPinStep").hidden=true;$("cloudAdminConfigStep").hidden=false;
-  $("cloudAdminUrl").value=c.url||"";$("cloudAdminKey").value=c.anonKey||"";$("cloudAdminBase").value=c.baseUrl||"";
-  setTimeout(()=>$("cloudAdminUrl")?.focus(),30);
-}
-$("cloudAdminBtn")?.addEventListener("click",openCloudAdmin);
-$("cloudAdminUnlock")?.addEventListener("click",unlockCloudAdmin);
-$("cloudAdminPin")?.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();unlockCloudAdmin()}});
-$("cloudAdminClose")?.addEventListener("click",closeCloudAdmin);
-$("cloudAdminCancel")?.addEventListener("click",closeCloudAdmin);
-$("cloudAdminModal")?.addEventListener("click",e=>{if(e.target===$("cloudAdminModal"))closeCloudAdmin()});
-$("cloudAdminSave")?.addEventListener("click",()=>{
-  const url=$("cloudAdminUrl")?.value.trim().replace(/\/$/,"")||"",key=$("cloudAdminKey")?.value.trim()||"",base=$("cloudAdminBase")?.value.trim()||"";
-  if(!url||!key||!base)return toast("Bitte alle Cloud-Felder ausfüllen","warn");
-  saveCloudConfig({url,anonKey:key,baseUrl:base});closeCloudAdmin();toast("JIGGY Cloud-Konfiguration gespeichert");
-});
-
-async function supabaseRpc(name,body){
-  const cfg=cloudConfig();if(!cfg.url||!cfg.anonKey)throw new Error("Supabase ist noch nicht konfiguriert.");
-  const r=await fetch(`${cfg.url}/rest/v1/rpc/${name}`,{method:"POST",headers:{"Content-Type":"application/json","apikey":cfg.anonKey,"Authorization":`Bearer ${cfg.anonKey}`},body:JSON.stringify(body)});
-  if(!r.ok){const txt=await r.text();throw new Error(txt.slice(0,220)||`HTTP ${r.status}`)}return r.text()
-}
+async function cloudRequest(path,options={}){const r=await fetch(JIGGY_CLOUD.apiUrl+path,options);const text=await r.text();let data={};try{data=text?JSON.parse(text):{}}catch{}if(!r.ok)throw new Error(data.error||text.slice(0,180)||`HTTP ${r.status}`);return data}
 $("publishProfileBtn")?.addEventListener("click",async()=>{
-  const c=car($("profileCar").value),btn=$("publishProfileBtn"),status=$("profilePublishStatus");if(!c)return toast("Kein Fahrzeug ausgewählt","warn");
-  const cloud=cloudConfig();if(!cloud.url||!cloud.anonKey||!cloud.baseUrl){status.textContent="Bitte zuerst Project URL, Anon Key und Profil-URL eintragen.";status.className="profile-publish-status bad";return}
-  let p=profileConfig(),secret=p.secret||randomSecret(),slug=p.slug||`${slugify(`${c.make}-${c.model}`)}-${Math.random().toString(36).slice(2,8)}`;
-  btn.disabled=true;btn.textContent="Veröffentliche …";status.textContent="Profilbild wird vorbereitet …";
-  try{
-    const image=await publicImageData(c),payload=profilePayload(c,image);
-    await supabaseRpc("publish_vehicle_profile",{p_slug:slug,p_secret:secret,p_payload:payload});
-    p={...localProfileSettings(),slug,secret,carId:c.id,publishedAt:new Date().toISOString()};saveProfileConfig(p);
-    status.textContent="Profil ist online. Link kann jetzt geteilt werden.";status.className="profile-publish-status good";toast("JIGGY-Profil veröffentlicht");renderPublicProfile()
-  }catch(e){console.error(e);status.textContent="Veröffentlichung fehlgeschlagen: "+e.message;status.className="profile-publish-status bad"}
-  finally{btn.disabled=false;btn.textContent="Profil veröffentlichen"}
+  const c=car($("profileCar").value),btn=$("publishProfileBtn"),status=$("profilePublishStatus");if(!c)return toast("Kein Fahrzeug ausgewählt","warn");let p=profileConfig();btn.disabled=true;btn.textContent=p.profileId?"Aktualisiere …":"Veröffentliche …";status.textContent="Profilbild wird vorbereitet …";
+  try{const image=await publicImageData(c),payload=profilePayload(c,image);if(p.profileId&&p.editToken){await cloudRequest(`/api/profiles/${encodeURIComponent(p.profileId)}`,{method:"PUT",headers:{"Content-Type":"application/json","Authorization":`Bearer ${p.editToken}`},body:JSON.stringify(payload)})}else{const created=await cloudRequest("/api/profiles",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});p={...p,profileId:created.id,editToken:created.editToken}}
+    p={...p,...localProfileSettings(),carId:c.id,publishedAt:new Date().toISOString()};saveProfileConfig(p);status.textContent="Profil ist online. Link kann jetzt geteilt werden.";status.className="profile-publish-status good";toast("JIGGY-Profil veröffentlicht");renderPublicProfile()
+  }catch(e){console.error(e);status.textContent="Veröffentlichung fehlgeschlagen: "+e.message;status.className="profile-publish-status bad"}finally{btn.disabled=false;btn.textContent="Profil veröffentlichen"}
 });
-$("copyProfileBtn")?.addEventListener("click",async()=>{const p=profileConfig(),c=cloudConfig();if(!p.slug||!c.baseUrl)return;const url=`${c.baseUrl}${c.baseUrl.includes("?")?"&":"?"}id=${encodeURIComponent(p.slug)}`;try{await navigator.clipboard.writeText(url);toast("Profil-Link kopiert")}catch{prompt("Profil-Link:",url)}});
-$("unpublishProfileBtn")?.addEventListener("click",async()=>{const p=profileConfig();if(!p.slug||!p.secret||!confirm("Öffentliches Profil wirklich offline nehmen?"))return;try{await supabaseRpc("delete_vehicle_profile",{p_slug:p.slug,p_secret:p.secret});saveProfileConfig({...p,slug:"",secret:""});$("profilePublishStatus").textContent="Profil wurde offline genommen.";toast("Profil offline","warn");renderPublicProfile()}catch(e){$("profilePublishStatus").textContent="Löschen fehlgeschlagen: "+e.message}});
+$("copyProfileBtn")?.addEventListener("click",async()=>{const p=profileConfig();if(!p.profileId)return;const url=`${JIGGY_CLOUD.baseUrl}${JIGGY_CLOUD.baseUrl.includes("?")?"&":"?"}id=${encodeURIComponent(p.profileId)}`;try{await navigator.clipboard.writeText(url);toast("Profil-Link kopiert")}catch{prompt("Profil-Link:",url)}});
+$("unpublishProfileBtn")?.addEventListener("click",async()=>{const p=profileConfig();if(!p.profileId||!p.editToken||!confirm("Öffentliches Profil wirklich offline nehmen?"))return;try{await cloudRequest(`/api/profiles/${encodeURIComponent(p.profileId)}`,{method:"DELETE",headers:{"Authorization":`Bearer ${p.editToken}`}});saveProfileConfig({...p,profileId:"",editToken:""});$("profilePublishStatus").textContent="Profil wurde offline genommen.";toast("Profil offline","warn");renderPublicProfile()}catch(e){$("profilePublishStatus").textContent="Löschen fehlgeschlagen: "+e.message}});
 
 function render(){refreshSelectors();renderHome();renderExtras();renderGallery();renderLists();renderStats();renderVault();renderReminderManager();renderPublicProfile()}
 $("exportBtn").onclick=()=>{const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="JIGGY_Backup.json";a.click();URL.revokeObjectURL(a.href)}
@@ -814,108 +781,40 @@ function drawCover(ctx,img,x,y,w,h){
   ctx.drawImage(img,sx,sy,sw,sh,x,y,w,h);
 }
 async function renderShareCard(){
-  const c=shareActiveCar(),canvas=document.getElementById("shareCanvas");if(!c||!canvas)return;
-  const format=document.getElementById("shareFormat")?.value||"post";
-  const theme=document.getElementById("shareTheme")?.value||"signature";
-  const purchase=document.getElementById("sharePurchase")?.checked;
-  const brand=document.getElementById("shareBrand")?.checked!==false;
-  const showPlate=document.getElementById("sharePlate")?.checked!==false;
-  const showVin=document.getElementById("shareVin")?.checked;
-  const showMods=document.getElementById("shareMods")?.checked!==false;
+  const c=shareActiveCar(),canvas=$("shareCanvas");if(!c||!canvas)return;
+  let theme=$("shareTheme")?.value||"clean",format=$("shareFormat")?.value||"post";if(theme==="story")format="story";
+  const sizes={post:[1080,1350],story:[1080,1920],wallpaper:[2560,1440],a4:[2480,3508],a3:[3508,4961]},[W,H]=sizes[format]||sizes.post;
+  canvas.width=W;canvas.height=H;
+  const ctx=canvas.getContext("2d"),S=W/1080,title=shareCarTitle(c)||"MEIN FAHRZEUG",img=await loadShareImage(findCarImage(c));
+  const accent=$("shareAccent")?.value||"#ed2636",zoom=(+$("shareZoom")?.value||100)/100,panX=(+$("sharePanX")?.value||0)/100,panY=(+$("sharePanY")?.value||0)/100;
+  const plate=$("sharePlate")?.checked!==false,brand=$("shareBrand")?.checked!==false,showMods=$("shareMods")?.checked!==false;
+  const mods=(state.builds||[]).filter(x=>x.carId===c.id&&/Verbaut|Erledigt|Fertig/i.test(x.status||"")).slice(-3).reverse();
+  const tx=(t,x,y,size,w=800,col="#fff",align="left")=>{ctx.fillStyle=col;ctx.textAlign=align;ctx.font=`${w} ${size*S}px Arial`;ctx.fillText(String(t),x,y)};
+  const fit=(t,max,size,min=18,w=900)=>{let s=size;while(s>min){ctx.font=`${w} ${s*S}px Arial`;if(ctx.measureText(t).width<=max)return s;s--}return min};
+  const cover=(x,y,w,h,shade=0)=>{if(!img)return;ctx.save();roundedRect(ctx,x,y,w,h,22*S);ctx.clip();const ir=img.width/img.height,br=w/h;let dw,dh;if(ir>br){dh=h*zoom;dw=dh*ir}else{dw=w*zoom;dh=dw/ir}const fx=Math.max(0,dw-w),fy=Math.max(0,dh-h);ctx.drawImage(img,x+(w-dw)/2+panX*fx/2,y+(h-dh)/2+panY*fy/2,dw,dh);if(shade){ctx.fillStyle=`rgba(0,0,0,${shade})`;ctx.fillRect(x,y,w,h)}ctx.restore()};
+  const footer=(col="#747a82")=>{if(brand){tx("JIGGY.",54*S,H-43*S,15,900,col);tx("YOUR CAR. YOUR STORY.",W-54*S,H-43*S,9,700,col,"right")}};
 
-  const sizes={post:[1080,1350],story:[1080,1920],wallpaper:[2560,1440],a4:[2480,3508],a3:[3508,4961]};
-  const [W,H]=sizes[format]||sizes.post;canvas.width=W;canvas.height=H;
-  const ctx=canvas.getContext("2d"),S=W/1080,portrait=H/W>1.15,wall=format==="wallpaper";
-  const themes={
-    signature:{bg:"#07090c",panel:"#11151a",text:"#ffffff",sub:"#929aa6",accent:"#e52b31"},
-    dark:{bg:"#090b0e",panel:"#14181d",text:"#ffffff",sub:"#9ba2ad",accent:"#d93035"},
-    performance:{bg:"#050506",panel:"#111113",text:"#ffffff",sub:"#b7b7ba",accent:"#ff2f35"},
-    blueprint:{bg:"#081019",panel:"#0d1925",text:"#edf7ff",sub:"#85a5bf",accent:"#62b8ff"},
-    street:{bg:"#0a0909",panel:"#171414",text:"#fff8f2",sub:"#b8aaa1",accent:"#ff493b"},
-    minimal:{bg:"#f2f0eb",panel:"#ffffff",text:"#111111",sub:"#6d6a66",accent:"#e02d31"}
-  },t=themes[theme]||themes.signature;
-
-  // background
-  ctx.fillStyle=t.bg;ctx.fillRect(0,0,W,H);
-  if(theme==="blueprint"){
-    ctx.strokeStyle="rgba(98,184,255,.09)";ctx.lineWidth=Math.max(1,S);
-    const grid=54*S;for(let x=0;x<W;x+=grid){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
-    for(let y=0;y<H;y+=grid){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
-  }
-  if(["signature","performance","street"].includes(theme)){
-    ctx.fillStyle=t.accent;ctx.save();ctx.globalAlpha=.95;
-    ctx.beginPath();ctx.moveTo(W*.76,0);ctx.lineTo(W,0);ctx.lineTo(W*.88,H*.16);ctx.lineTo(W*.68,H*.16);ctx.closePath();ctx.fill();ctx.restore();
-  }
-
-  const pad=(wall?72:70)*S;
-  const imageX=pad, imageY=(wall?160:portrait?145:120)*S;
-  const imageW=wall?W*.57:W-pad*2;
-  const imageH=wall?H-imageY-pad:Math.min(H*.43,780*S);
-  roundedRect(ctx,imageX,imageY,imageW,imageH,32*S);ctx.save();ctx.clip();
-  const img=await loadShareImage(findCarImage(c));
-  if(img)drawCover(ctx,img,imageX,imageY,imageW,imageH);
-  else{ctx.fillStyle=t.panel;ctx.fillRect(imageX,imageY,imageW,imageH);ctx.fillStyle=t.sub;ctx.font=`800 ${34*S}px Arial`;ctx.textAlign="center";ctx.fillText("JIGGY VEHICLE",imageX+imageW/2,imageY+imageH/2)}
-  ctx.restore();
-
-  const grad=ctx.createLinearGradient(0,imageY+imageH*.45,0,imageY+imageH);grad.addColorStop(0,"rgba(0,0,0,0)");grad.addColorStop(1,"rgba(0,0,0,.82)");ctx.fillStyle=grad;ctx.fillRect(imageX,imageY,imageW,imageH);
-
-  // masthead
-  ctx.textAlign="left";ctx.fillStyle=t.text;ctx.font=`900 ${26*S}px Arial`;ctx.fillText("JIGGY.",pad,58*S);
-  ctx.fillStyle=t.accent;ctx.fillRect(pad,70*S,72*S,5*S);
-  ctx.fillStyle=t.sub;ctx.font=`600 ${12*S}px Arial`;ctx.fillText("YOUR CAR. YOUR STORY.",pad,94*S);
-
-  const title=shareCarTitle(c)||"Mein Fahrzeug";
-  if(wall){
-    const tx=W*.64,tw=W-tx-pad;
-    ctx.fillStyle=t.text;let f=fitText(ctx,title,tw,62*S,30*S);ctx.font=`900 ${f}px Arial`;ctx.fillText(title.toUpperCase(),tx,250*S);
-    ctx.fillStyle=t.accent;ctx.fillRect(tx,278*S,115*S,7*S);
-    const specs=[[c.power?`${c.power} PS`:"—","POWER"],[c.torque?`${c.torque} NM`:"—","TORQUE"],[c.year||"—","YEAR"]];
-    specs.forEach((s,i)=>{const y=(390+i*155)*S;ctx.fillStyle=t.sub;ctx.font=`700 ${14*S}px Arial`;ctx.fillText(s[1],tx,y);ctx.fillStyle=t.text;ctx.font=`900 ${43*S}px Arial`;ctx.fillText(String(s[0]),tx,y+48*S)});
-    if(showPlate&&c.plate){ctx.fillStyle=t.panel;roundedRect(ctx,tx,850*S,tw,78*S,14*S);ctx.fill();ctx.fillStyle=t.text;ctx.font=`800 ${26*S}px monospace`;ctx.fillText(c.plate,tx+22*S,900*S)}
-    if(showVin&&c.vin){ctx.fillStyle=t.sub;ctx.font=`600 ${12*S}px monospace`;ctx.fillText(`VIN ${c.vin}`,tx,980*S)}
+  if(theme==="clean"){
+    ctx.fillStyle="#08090b";ctx.fillRect(0,0,W,H);const imageH=H*(format==="story"?.68:.60);cover(36*S,42*S,W-72*S,imageH,.04);
+    let g=ctx.createLinearGradient(0,imageH*.70,0,imageH+90*S);g.addColorStop(0,"rgba(8,9,11,0)");g.addColorStop(1,"rgba(8,9,11,1)");ctx.fillStyle=g;ctx.fillRect(36*S,imageH*.66,W-72*S,imageH*.42);
+    tx("JIGGY PERFORMANCE",58*S,78*S,11,900,"#fff");if(plate&&c.plate)tx(c.plate,W-58*S,78*S,13,800,"#fff","right");
+    const titleY=imageH+40*S,hs=fit(title.toUpperCase(),W-116*S,format==="story"?58:50,28);tx(title.toUpperCase(),58*S,titleY,hs,900,"#fff");
+    const sy=titleY+58*S;ctx.fillStyle=accent;ctx.fillRect(58*S,sy-18*S,78*S,3*S);
+    const specGap=(W-116*S)/3;[[c.power?`${c.power} PS`:"—","LEISTUNG"],[c.torque?`${c.torque} NM`:"—","DREHMOMENT"],[(c.gearbox||"—").toUpperCase(),"GETRIEBE"]].forEach((sp,i)=>{const x=58*S+i*specGap;tx(sp[0],x,sy+24*S,format==="story"?25:22,900,"#fff");tx(sp[1],x,sy+48*S,10,700,"#838a94")});
+    let my=sy+105*S;if(showMods&&mods.length){tx("VERBAUTE MODS",58*S,my,12,900,accent);mods.slice(0,format==="story"?3:2).forEach((m,i)=>tx(m.name,58*S,my+(38+i*34)*S,format==="story"?17:15,800,"#e7e9ec"))}footer();
+  }else if(theme==="performance"){
+    ctx.fillStyle="#050608";ctx.fillRect(0,0,W,H);ctx.fillStyle=accent;ctx.fillRect(0,0,12*S,H);cover(34*S,36*S,W-68*S,H*.64,.12);
+    let g=ctx.createLinearGradient(0,H*.38,0,H*.76);g.addColorStop(0,"rgba(5,6,8,0)");g.addColorStop(1,"rgba(5,6,8,1)");ctx.fillStyle=g;ctx.fillRect(34*S,H*.35,W-68*S,H*.43);
+    tx("JIGGY / PERFORMANCE DIVISION",52*S,72*S,11,900,"#fff");const hs=fit(title.toUpperCase(),W-104*S,58,30);tx(title.toUpperCase(),52*S,H*.61,hs,900,"#fff");
+    tx([c.power&&`${c.power} PS`,c.torque&&`${c.torque} NM`].filter(Boolean).join("  /  "),52*S,H*.655,18,900,accent);
+    let y=H*.72;if(showMods&&mods.length){tx("BUILD SHEET",52*S,y,11,900,"#7f8690");mods.forEach((m,i)=>tx(`0${i+1}  ${m.name}`,52*S,y+(39+i*34)*S,17,800,"#fff"))}if(plate&&c.plate)tx(c.plate,W-52*S,H*.655,16,800,"#fff","right");footer();
   }else{
-    ctx.fillStyle="#fff";const f=fitText(ctx,title,imageW-70*S,58*S,31*S);ctx.font=`900 ${f}px Arial`;ctx.fillText(title.toUpperCase(),imageX+34*S,imageY+imageH-50*S);
-    if(showPlate&&c.plate){ctx.fillStyle="rgba(0,0,0,.68)";roundedRect(ctx,imageX+34*S,imageY+32*S,250*S,52*S,10*S);ctx.fill();ctx.fillStyle="#fff";ctx.font=`800 ${20*S}px monospace`;ctx.fillText(c.plate,imageX+52*S,imageY+66*S)}
+    ctx.fillStyle="#07080a";ctx.fillRect(0,0,W,H);cover(34*S,115*S,W-68*S,H*.61,.08);let g=ctx.createLinearGradient(0,H*.48,0,H*.80);g.addColorStop(0,"rgba(7,8,10,0)");g.addColorStop(1,"rgba(7,8,10,1)");ctx.fillStyle=g;ctx.fillRect(0,H*.45,W,H*.38);
+    tx("JIGGY STORY",48*S,72*S,12,900,accent);const hs=fit(title.toUpperCase(),W-96*S,56,29);tx(title.toUpperCase(),48*S,H*.69,hs,900,"#fff");
+    tx([c.power&&`${c.power} PS`,c.torque&&`${c.torque} NM`,c.year].filter(Boolean).join("  ·  "),48*S,H*.728,18,800,"#cbd0d6");
+    if(showMods&&mods.length){tx("BUILD",48*S,H*.778,11,900,accent);mods.slice(0,2).forEach((m,i)=>tx(m.name,48*S,H*(.805+i*.027),16,800,"#fff"))}if(plate&&c.plate)tx(c.plate,W-48*S,H*.728,15,800,"#fff","right");footer();
   }
-
-  if(!wall){
-    let infoY=imageY+imageH+58*S;
-    ctx.fillStyle=t.text;ctx.font=`900 ${26*S}px Arial`;ctx.fillText(theme==="blueprint"?"TECHNICAL IDENTITY":"VEHICLE IDENTITY",pad,infoY);
-    ctx.fillStyle=t.accent;ctx.fillRect(pad,infoY+15*S,88*S,6*S);
-    infoY+=62*S;
-    let rows=[
-      ["Leistung",c.power?`${c.power} PS`:"—"],["Drehmoment",c.torque?`${c.torque} Nm`:"—"],
-      ["Baujahr",c.year||"—"],["Kraftstoff",c.fuel||"—"],["Getriebe",c.gearbox||"—"],
-      ["Kilometer",c.km?`${num(c.km)} km`:"—"]
-    ];
-    if(purchase)rows.push(["Kaufpreis",shareMoney(c.purchase)]);
-    if(showVin&&c.vin)rows.push(["VIN",c.vin]);
-    const cols=2,gap=18*S,boxW=(W-pad*2-gap)/2,boxH=91*S;
-    rows.forEach((r,i)=>{
-      const x=pad+(i%cols)*(boxW+gap),y=infoY+Math.floor(i/cols)*(boxH+gap);
-      ctx.fillStyle=t.panel;roundedRect(ctx,x,y,boxW,boxH,18*S);ctx.fill();
-      if(theme==="blueprint"){ctx.strokeStyle="rgba(98,184,255,.30)";ctx.lineWidth=1*S;ctx.stroke()}
-      ctx.fillStyle=t.sub;ctx.font=`700 ${14*S}px Arial`;ctx.fillText(String(r[0]).toUpperCase(),x+20*S,y+28*S);
-      ctx.fillStyle=t.text;ctx.font=`900 ${23*S}px Arial`;ctx.fillText(String(r[1]),x+20*S,y+65*S);
-    });
-
-    if(showMods){
-      const mods=(state.builds||[]).filter(x=>x.carId===c.id && (x.status==="Verbaut"||x.status==="Erledigt"||x.status==="Fertig")).slice(-3).reverse();
-      if(mods.length){
-        const y=infoY+Math.ceil(rows.length/2)*(boxH+gap)+24*S;
-        if(y<H-135*S){
-          ctx.fillStyle=t.sub;ctx.font=`700 ${13*S}px Arial`;ctx.fillText("JIGGY BUILD",pad,y);
-          ctx.fillStyle=t.text;ctx.font=`800 ${19*S}px Arial`;
-          mods.forEach((m,i)=>ctx.fillText(`/ ${m.name}`,pad,y+(31+i*28)*S));
-        }
-      }
-    }
-  }
-  if(brand){
-    ctx.fillStyle=t.sub;ctx.font=`700 ${14*S}px Arial`;ctx.textAlign=wall?"left":"center";
-    ctx.fillText("Made with JIGGY.  ·  Your car. Your story.",wall?pad:W/2,H-38*S);
-  }
-}
+}document.addEventListener("input",e=>{if(["shareZoom","sharePanX","sharePanY","shareAccent"].includes(e.target?.id))renderShareCard()});
 function openShareCard(carId){
   shareCarId=carId||state.activeCarId;const m=document.getElementById("shareModal");if(!m)return;m.classList.add("open");m.setAttribute("aria-hidden","false");renderShareCard();
 }
@@ -943,6 +842,16 @@ document.addEventListener("click",e=>{
   if(e.target?.id==="shareNative")nativeShareCard();
   if(e.target?.id==="shareModal")closeShareCard();
 });
+
+document.addEventListener("click",e=>{
+  const card=e.target.closest(".poster-theme-card[data-theme]");
+  if(!card)return;
+  const input=document.getElementById("shareTheme");if(!input)return;
+  input.value=card.dataset.theme;
+  document.querySelectorAll(".poster-theme-card").forEach(x=>x.classList.toggle("active",x===card));
+  renderShareCard();
+});
+
 document.addEventListener("change",e=>{if(["shareFormat","shareTheme","sharePlate","shareVin","shareMods","sharePurchase","shareBrand"].includes(e.target?.id))renderShareCard()});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeShareCard()});
 const shareObserver=new MutationObserver(()=>ensureShareButtons());
@@ -1013,3 +922,5 @@ async function hydrateVehicleExampleImages(){
   if(changed){save();renderHome();renderLists()}
 }
 setTimeout(hydrateVehicleExampleImages,500);
+
+
