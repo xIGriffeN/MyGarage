@@ -1,32 +1,45 @@
-# JIGGY.
+# JIGGY. 🚗
 
-**Your car. Your story.**
+### Your car. Your story.
 
-JIGGY is a desktop garage and vehicle-history app for Windows.
+JIGGY ist deine digitale Garage für alles, was zu deinem Auto gehört.
 
-## Current version
+Fahrzeuge verwalten, Umbauten dokumentieren, Tankstopps festhalten, Rechnungen und Dokumente speichern oder einfach verfolgen, was mit dem Auto über die Zeit passiert ist.
 
-**1.9.4**
+Alles an einem Ort – ohne Excel-Chaos und ohne Zettelwirtschaft.
 
-## JIGGY Cloud
+## Was JIGGY kann
 
-Public profiles use the self-hosted JIGGY Cloud API:
+- 🚗 Mehrere Fahrzeuge verwalten
+- 🔧 Umbauten & Builds dokumentieren
+- 🛠️ Service & Wartungen festhalten
+- ⛽ Tankbuch führen
+- 🧾 Tankbelege speichern
+- 📸 Fahrzeuggalerie
+- 📖 Logbuch mit Bildern
+- 📄 Dokumente & PDFs speichern
+- 📅 HU / TÜV im Blick behalten
+- 🔔 Erinnerungen verwalten
+- ☁️ Synchronisierung über JIGGY Cloud
+- 👤 Eigene Accounts
+- 🌐 Öffentliche Fahrzeugprofile
+- 📱 JIGGY Mobile / PWA
 
-`https://api.jiggy-cloud.org`
+## JIGGY Cloud ☁️
 
-The public profile frontend is deployed from `public-profile/` through GitHub Pages.
+Deine Garage bleibt nicht mehr nur auf einem einzelnen PC.
 
-## Development
+Mit JIGGY Cloud können Fahrzeugdaten, Bilder, Dokumente und weitere Inhalte mit deinem Account synchronisiert und auf anderen Geräten wiederhergestellt werden.
 
-```bash
-npm install
-npm start
-```
+## Plattformen
 
-## Windows build
+🖥️ **Windows** – vollständige Desktop-App  
+📱 **iPhone / iPad** – über JIGGY Mobile als PWA  
+🌐 **Web** – JIGGY Cloud
 
-```bash
-npm run dist
-```
+---
 
-GitHub tag releases matching `v*` are built by `.github/workflows/release.yml`.
+Built for people who are way too attached to their cars.
+
+**JIGGY.**  
+*Your car. Your story.*
