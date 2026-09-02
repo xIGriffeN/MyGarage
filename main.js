@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, protocol, Notification } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, protocol, Notification, clipboard } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
@@ -274,6 +274,15 @@ ipcMain.handle("vehicle:example-image", async (_event, payload = {}) => {
   } catch (err) {
     console.log("Vehicle image:", err.message);
     return { ok: false, error: "Bildsuche fehlgeschlagen: " + err.message };
+  }
+});
+
+ipcMain.handle("app:copy-text", async (_event, text) => {
+  try {
+    clipboard.writeText(String(text || ""));
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message };
   }
 });
 

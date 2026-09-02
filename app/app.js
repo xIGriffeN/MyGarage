@@ -106,7 +106,11 @@ function load(){
   }catch{return blank()}
 }
 let state=load();
-function save(){localStorage.setItem(KEY,JSON.stringify(state))}
+let cloudSyncTimer=null,cloudSyncApplying=false,cloudSyncRunning=false;
+function save(){
+  localStorage.setItem(KEY,JSON.stringify(state));
+  if(!cloudSyncApplying && typeof scheduleCloudSync==="function")scheduleCloudSync();
+}
 function car(id=state.activeCarId){return state.cars.find(c=>c.id===id)||state.cars[0]||null}
 function cname(c){return c?[c.make,c.model,c.variant].filter(Boolean).join(" "):"Kein Fahrzeug"}
 function setActive(id){if(!id)return;state.activeCarId=id;save();render()}
@@ -494,15 +498,42 @@ function renderExtras(){
  $("costBreakdown").innerHTML=[["Kaufpreis",purchase],["Tanken",fuel],["Service",service],["Umbauten",buildsCost],["Gesamt",purchase+fuel+service+buildsCost]].map((x,i)=>`<div class="cost-row ${i===4?"total":""}"><span>${x[0]}</span><b>${money(x[1])}</b></div>`).join("");
 }
 let galleryPending=false;
+function repairGalleryVehicleLinks(){
+  if(!state.cars.length)return null;
+  const validIds=new Set(state.cars.map(c=>c.id));
+  const oldActive=state.activeCarId;
+  let changed=false;
+
+  // A cloud import can replace an old local vehicle id. Older gallery rows may
+  // still point at that vanished id, which makes them invisible and prevents upload.
+  const staleIds=[...new Set((state.gallery||[]).map(x=>x?.carId).filter(id=>id&&!validIds.has(id)))];
+  for(const staleId of staleIds){
+    const rows=(state.gallery||[]).filter(x=>x?.carId===staleId);
+    const target=state.cars.find(c=>rows.some(p=>typeof p.image==="string"&&p.image.startsWith("data:image/")&&p.image===c.image))
+      ||(staleId===oldActive?state.cars[0]:null);
+    if(!target)continue;
+    for(const row of rows){row.carId=target.id;changed=true}
+    if(state.activeCarId===staleId){state.activeCarId=target.id;changed=true}
+  }
+
+  if(!state.activeCarId||!validIds.has(state.activeCarId)){
+    state.activeCarId=state.cars[0]?.id||null;changed=true;
+  }
+  if(changed)localStorage.setItem(KEY,JSON.stringify(state));
+  return state.activeCarId;
+}
 $("galleryInput").onchange=async e=>{
  if(!state.cars.length)return alert("Bitte zuerst ein Fahrzeug anlegen.");
+ repairGalleryVehicleLinks();
  const file=e.target.files?.[0];if(!file)return;
  try{
-   const mine=state.gallery.filter(x=>x.carId===state.activeCarId);
+   // Remove legacy/ghost gallery rows that contain neither a local image nor a cloud media id.
+   state.gallery=(state.gallery||[]).filter(x=>x.carId!==state.activeCarId||isDataImage(x.image)||!!x.imageMediaId);
+   const mine=state.gallery.filter(x=>x.carId===state.activeCarId&&(isDataImage(x.image)||x.imageMediaId));
    if(mine.length>=5)return alert("Maximal 5 Bilder pro Fahrzeug.");
    const image=await fileData(file);
    state.gallery.push({id:uid(),carId:state.activeCarId,image,cover:mine.length===0});
-   if(mine.length===0){let c=car();if(c)c.image=image}
+   if(mine.length===0){let c=car(state.activeCarId);if(c)c.image=image}
    save();e.target.value="";render()
  }catch{alert("Bild bitte kleiner als 3 MB wählen.")}
 };
@@ -513,9 +544,14 @@ window.coverPhoto=id=>{
 };
 window.delPhoto=id=>{state.gallery=state.gallery.filter(x=>x.id!==id);save();render()};
 function renderGallery(){
- const c=car(),a=state.gallery.filter(x=>c&&x.carId===c.id);
- $("miniGallery").innerHTML=a.length?a.map(x=>`<div class="mini-photo ${x.cover?"cover":""}"><img src="${x.image}" alt=""><div class="mini-photo-actions"><button onclick="coverPhoto('${x.id}')">${x.cover?"Titel":"Titelbild"}</button><button onclick="delPhoto('${x.id}')">×</button></div></div>`).join(""):'<div class="empty">Noch keine Bilder.</div>';
+ repairGalleryVehicleLinks();
+ const carId=state.activeCarId;
+ // Use the real active id directly. car() intentionally falls back to the first
+ // vehicle when an id is stale, which previously made valid gallery photos invisible.
+ const a=(state.gallery||[]).filter(x=>carId&&x.carId===carId&&(isDataImage(x.image)||!!x.imageMediaId));
+ $("miniGallery").innerHTML=a.length?a.map(x=>`<div class="mini-photo ${x.cover?"cover":""}">${x.image?`<img src="${x.image}" alt="">`:`<div class="empty">Bild wird aus der Cloud geladen …</div>`}<div class="mini-photo-actions"><button onclick="coverPhoto('${x.id}')">${x.cover?"Titel":"Titelbild"}</button><button onclick="delPhoto('${x.id}')">×</button></div></div>`).join(""):'<div class="empty">Noch keine Bilder.</div>';
 }
+
 function renderLists(){
   const c=car();
   $("carList").innerHTML=state.cars.length?state.cars.map(x=>`<div class="vehicle-card">
@@ -653,10 +689,434 @@ async function checkReminderNotifications(){
 }
 setTimeout(checkReminderNotifications,1800);setInterval(checkReminderNotifications,60*60*1000);
 
+/* JIGGY 2.0 beta 4 · Account, two-way sync & Media Storage */
+const ACCOUNT_KEY="jiggy.account.v1", CLOUD_MAP_KEY="jiggy.cloud.vehicle-map.v1", CLOUD_SYNC_META_KEY="jiggy.cloud.sync-meta.v1";
+const ACCOUNT_OWNER_KEY="jiggy.local.owner.v1", ACCOUNT_ISOLATION_KEY="jiggy.account.isolation.v1", ACCOUNT_CACHE_PREFIX="jiggy.account.cache.v1.";
+let accountMode="login";
+function accountSession(){try{return JSON.parse(localStorage.getItem(ACCOUNT_KEY)||"{}")||{}}catch{return{}}}
+function saveAccountSession(v){localStorage.setItem(ACCOUNT_KEY,JSON.stringify(v||{}))}
+function cloudMap(){try{return JSON.parse(localStorage.getItem(CLOUD_MAP_KEY)||"{}")||{}}catch{return{}}}
+function saveCloudMap(v){localStorage.setItem(CLOUD_MAP_KEY,JSON.stringify(v||{}))}
+function syncMeta(){try{return JSON.parse(localStorage.getItem(CLOUD_SYNC_META_KEY)||"{}")||{}}catch{return{}}}
+function saveSyncMeta(v){localStorage.setItem(CLOUD_SYNC_META_KEY,JSON.stringify(v||{}))}
+function accountCacheKey(userId){return ACCOUNT_CACHE_PREFIX+String(userId||"")}
+function saveCurrentAccountCache(userId){
+  if(!userId)return;
+  try{localStorage.setItem(accountCacheKey(userId),JSON.stringify({state,cloudMap:cloudMap(),syncMeta:syncMeta(),mediaMap:cloudMediaMap()}))}catch(e){console.warn("Account cache save",e)}
+}
+function restoreAccountCache(userId){
+  try{
+    const raw=localStorage.getItem(accountCacheKey(userId));
+    if(!raw)return false;
+    const x=JSON.parse(raw)||{};
+    state=x.state&&typeof x.state==="object"?x.state:blank();
+    localStorage.setItem(KEY,JSON.stringify(state));
+    saveCloudMap(x.cloudMap||{});saveSyncMeta(x.syncMeta||{});saveCloudMediaMap(x.mediaMap||{});
+    return true;
+  }catch(e){console.warn("Account cache restore",e);return false}
+}
+function clearActiveGarageState(){
+  state=blank();
+  localStorage.setItem(KEY,JSON.stringify(state));
+  saveCloudMap({});saveSyncMeta({});saveCloudMediaMap({});
+}
+function switchLocalGarageToAccount(user){
+  const nextId=user?.id;if(!nextId)return;
+  const currentOwner=localStorage.getItem(ACCOUNT_OWNER_KEY)||"";
+  const isolated=localStorage.getItem(ACCOUNT_ISOLATION_KEY)==="1";
+  if(!isolated){
+    // First run of account isolation: assign the existing local garage to the currently authenticated account.
+    localStorage.setItem(ACCOUNT_ISOLATION_KEY,"1");
+    localStorage.setItem(ACCOUNT_OWNER_KEY,nextId);
+    saveCurrentAccountCache(nextId);
+    return;
+  }
+  if(currentOwner===nextId)return;
+  if(currentOwner)saveCurrentAccountCache(currentOwner);
+  clearActiveGarageState();
+  restoreAccountCache(nextId);
+  localStorage.setItem(ACCOUNT_OWNER_KEY,nextId);
+  render();
+}
+function logoutLocalAccount(){
+  const owner=localStorage.getItem(ACCOUNT_OWNER_KEY)||accountSession().user?.id||"";
+  if(owner)saveCurrentAccountCache(owner);
+  clearActiveGarageState();
+  localStorage.removeItem(ACCOUNT_OWNER_KEY);
+  saveAccountSession({});
+  render();
+}
+async function authCloudRequest(path,options={}){
+  const session=accountSession();
+  if(!session.token)throw new Error("Bitte zuerst anmelden");
+  const headers={...(options.headers||{}),Authorization:`Bearer ${session.token}`};
+  return cloudRequest(path,{...options,headers});
+}
+function setAccountMessage(text,type=""){const el=$("accountMessage");if(el){el.textContent=text;el.className="cloud-message "+type}}
+function setImportMessage(text,type=""){const el=$("cloudImportStatus");if(el){el.textContent=text;el.className="cloud-message "+type}}
+function setCloudConnectionState(state){
+  const el=$("cloudConnectionBadge");if(!el)return;
+  const states={online:["● JIGGY Cloud verbunden","online"],offline:["● JIGGY Cloud offline","offline"],checking:["● Cloud wird geprüft","checking"],syncing:["● JIGGY Cloud synchronisiert","checking"]};
+  const [text,cls]=states[state]||states.checking;el.textContent=text;el.className="cloud-connection "+cls;
+}
+async function checkCloudConnection(){setCloudConnectionState("checking");try{await cloudRequest("/health");setCloudConnectionState("online");return true}catch{setCloudConnectionState("offline");return false}}
+function setAccountMode(mode){
+  accountMode=mode;const reg=mode==="register";
+  $("accountNameWrap") && ($("accountNameWrap").hidden=!reg);
+  if($("accountSubmit"))$("accountSubmit").textContent=reg?"Account erstellen":"Anmelden";
+  $("accountLoginTab")?.classList.toggle("active",!reg);$("accountRegisterTab")?.classList.toggle("active",reg);
+  if($("accountPassword"))$("accountPassword").autocomplete=reg?"new-password":"current-password";
+  setAccountMessage(reg?"Erstelle deinen JIGGY Account direkt auf deinem eigenen Server.":"Melde dich an, um deine private Cloud-Garage zu öffnen.");
+}
+function renderAccount(user=null){
+  const session=accountSession(),logged=!!session.token;
+  if($("accountLoggedOut"))$("accountLoggedOut").hidden=logged;if($("accountLoggedIn"))$("accountLoggedIn").hidden=!logged;
+  const badge=$("accountStateBadge");if(badge){badge.textContent=logged?"Angemeldet":"Nicht angemeldet";badge.classList.toggle("online",logged)}
+  const u=user||session.user;if(logged&&u){if($("accountUserName"))$("accountUserName").textContent=u.displayName||"JIGGY User";if($("accountUserEmail"))$("accountUserEmail").textContent=u.email||""}
+}
+const CLOUD_MEDIA_MAP_KEY="jiggy.cloud.media-map.v1";
+function cloudMediaMap(){try{return JSON.parse(localStorage.getItem(CLOUD_MEDIA_MAP_KEY)||"{}")||{}}catch{return{}}}
+function saveCloudMediaMap(v){localStorage.setItem(CLOUD_MEDIA_MAP_KEY,JSON.stringify(v||{}))}
+function isDataImage(v){return typeof v==="string"&&v.startsWith("data:image/")}
+function dataUrlToFile(dataUrl,name="vehicle.jpg"){
+  const [head,data]=dataUrl.split(","),mime=(head.match(/data:([^;]+)/)||[])[1]||"image/jpeg",bytes=atob(data),arr=new Uint8Array(bytes.length);for(let i=0;i<bytes.length;i++)arr[i]=bytes.charCodeAt(i);
+  const ext=mime.includes("png")?"png":mime.includes("webp")?"webp":mime.includes("heic")?"heic":mime.includes("heif")?"heif":"jpg";
+  return new File([arr],name.replace(/\.[^.]+$/,"")+"."+ext,{type:mime});
+}
+async function uploadVehicleCover(localId,cloudId,image){
+  if(!isDataImage(image)||!cloudId)return null;
+  const fd=new FormData();fd.append("file",dataUrlToFile(image,`jiggy-${localId}.jpg`));fd.append("mediaType","vehicle-cover");fd.append("vehicleId",cloudId);
+  const out=await authCloudRequest("/api/media",{method:"POST",body:fd});return out.media||null;
+}
+async function downloadMediaDataUrl(mediaId){
+  if(!mediaId)return"";const session=accountSession();const r=await fetch(JIGGY_CLOUD.apiUrl+`/api/media/${encodeURIComponent(mediaId)}`,{headers:{Authorization:`Bearer ${session.token}`}});if(!r.ok)throw new Error(`Media HTTP ${r.status}`);const blob=await r.blob();return await new Promise((ok,bad)=>{const fr=new FileReader();fr.onload=()=>ok(fr.result);fr.onerror=bad;fr.readAsDataURL(blob)});
+}
+async function ensureCloudCover(c,cloudId){
+  if(!c||!cloudId||!isDataImage(c.image))return null;const mm=cloudMediaMap(),fp=`${c.image.length}:${c.image.slice(-64)}`,known=mm[c.id];if(known?.fingerprint===fp&&known?.mediaId)return known.mediaId;
+  const media=await uploadVehicleCover(c.id,cloudId,c.image);if(!media?.id)return null;mm[c.id]={mediaId:media.id,fingerprint:fp};saveCloudMediaMap(mm);return media.id;
+}
+function galleryMediaMapKey(photoId){return `gallery:${photoId}`}
+async function uploadGalleryImage(photo,cloudId){
+  if(!photo||!cloudId||!isDataImage(photo.image))return null;
+  const fd=new FormData();fd.append("file",dataUrlToFile(photo.image,`jiggy-gallery-${photo.id}.jpg`));fd.append("mediaType","gallery");fd.append("vehicleId",cloudId);
+  const out=await authCloudRequest("/api/media",{method:"POST",body:fd});return out.media||null;
+}
+async function ensureCloudGallery(c,cloudId){
+  if(!c||!cloudId)return;
+  repairGalleryVehicleLinks();
+  const mm=cloudMediaMap(),photos=(state.gallery||[]).filter(x=>x&&x.carId===c.id);
+  let changed=false;
+  for(const photo of photos){
+    if(!isDataImage(photo.image))continue;
+    const key=galleryMediaMapKey(photo.id),fp=`${photo.image.length}:${photo.image.slice(-64)}`,known=mm[key];
+    if(known?.fingerprint===fp&&known?.mediaId){if(photo.imageMediaId!==known.mediaId){photo.imageMediaId=known.mediaId;changed=true}continue}
+    try{
+      const media=await uploadGalleryImage(photo,cloudId);
+      if(media?.id){mm[key]={mediaId:media.id,fingerprint:fp};photo.imageMediaId=media.id;changed=true}
+    }catch(e){console.warn("Gallery upload",photo.id,e)}
+  }
+  saveCloudMediaMap(mm);
+  if(changed)localStorage.setItem(KEY,JSON.stringify(state));
+}
+function fuelReceiptMediaMapKey(fuelId){return `fuel-receipt:${fuelId}`}
+async function uploadFuelReceipt(row,cloudId,fileRow){
+  if(!row||!cloudId||!fileRow?.blob)return null;
+  const file=new File([fileRow.blob],fileRow.name||row.receiptFileName||`jiggy-receipt-${row.id}`,{type:fileRow.type||row.receiptFileType||"application/octet-stream"});
+  const fd=new FormData();fd.append("file",file);fd.append("mediaType","fuel-receipt");fd.append("vehicleId",cloudId);
+  const out=await authCloudRequest("/api/media",{method:"POST",body:fd});return out.media||null;
+}
+async function ensureCloudFuelReceipts(c,cloudId){
+  if(!c||!cloudId)return;
+  const mm=cloudMediaMap(),rows=(state.fuel||[]).filter(x=>x&&x.carId===c.id&&x.receiptFileId);
+  let changed=false;
+  for(const row of rows){
+    try{
+      const local=await vaultGet(row.receiptFileId);if(!local?.blob)continue;
+      const key=fuelReceiptMediaMapKey(row.id),fp=`${local.name||""}:${local.type||""}:${local.size||local.blob.size||0}:${local.created||0}`,known=mm[key];
+      if(known?.fingerprint===fp&&known?.mediaId){if(row.receiptMediaId!==known.mediaId){row.receiptMediaId=known.mediaId;changed=true}continue}
+      const media=await uploadFuelReceipt(row,cloudId,local);
+      if(media?.id){mm[key]={mediaId:media.id,fingerprint:fp};row.receiptMediaId=media.id;changed=true}
+    }catch(e){console.warn("Fuel receipt upload",row.id,e)}
+  }
+  saveCloudMediaMap(mm);
+  if(changed)localStorage.setItem(KEY,JSON.stringify(state));
+}
+async function downloadMediaBlob(mediaId){
+  if(!mediaId)return null;const session=accountSession();const r=await fetch(JIGGY_CLOUD.apiUrl+`/api/media/${encodeURIComponent(mediaId)}`,{headers:{Authorization:`Bearer ${session.token}`}});if(!r.ok)throw new Error(`Media HTTP ${r.status}`);return await r.blob();
+}
+async function restoreFuelReceiptFromCloud(row){
+  if(!row?.receiptMediaId)return row;
+  if(row.receiptFileId){try{const existing=await vaultGet(row.receiptFileId);if(existing?.blob)return row}catch{}}
+  const blob=await downloadMediaBlob(row.receiptMediaId);
+  if(!blob)return row;
+  const name=row.receiptFileName||`Tankbeleg-${row.id}${blob.type==="application/pdf"?".pdf":""}`;
+  const file=new File([blob],name,{type:row.receiptFileType||blob.type||"application/octet-stream"});
+  const saved=await vaultPut(file);
+  row.receiptFileId=saved.id;row.receiptFileName=saved.name;row.receiptFileType=saved.type;row.receiptFileSize=saved.size;
+  const mm=cloudMediaMap();mm[fuelReceiptMediaMapKey(row.id)]={mediaId:row.receiptMediaId,fingerprint:`${saved.name||""}:${saved.type||""}:${saved.size||0}:0`};saveCloudMediaMap(mm);
+  return row;
+}
+
+function documentMediaMapKey(docId){return `document:${docId}`}
+async function uploadVaultDocument(row,cloudId,fileRow){
+  if(!row||!cloudId||!fileRow?.blob)return null;
+  const file=new File([fileRow.blob],fileRow.name||row.fileName||`jiggy-document-${row.id}`,{type:fileRow.type||row.fileType||"application/octet-stream"});
+  const fd=new FormData();fd.append("file",file);fd.append("mediaType","document");fd.append("vehicleId",cloudId);
+  const out=await authCloudRequest("/api/media",{method:"POST",body:fd});return out.media||null;
+}
+async function ensureCloudDocuments(c,cloudId){
+  if(!c||!cloudId)return;
+  const mm=cloudMediaMap(),rows=(state.documents||[]).filter(x=>x&&x.carId===c.id&&x.fileId);
+  let changed=false;
+  for(const row of rows){
+    try{
+      const local=await vaultGet(row.fileId);if(!local?.blob)continue;
+      const key=documentMediaMapKey(row.id),fp=`${local.name||""}:${local.type||""}:${local.size||local.blob.size||0}:${local.created||0}`,known=mm[key];
+      if(known?.fingerprint===fp&&known?.mediaId){if(row.fileMediaId!==known.mediaId){row.fileMediaId=known.mediaId;changed=true}continue}
+      const media=await uploadVaultDocument(row,cloudId,local);
+      if(media?.id){mm[key]={mediaId:media.id,fingerprint:fp};row.fileMediaId=media.id;changed=true}
+    }catch(e){console.warn("Document upload",row.id,e)}
+  }
+  saveCloudMediaMap(mm);
+  if(changed)localStorage.setItem(KEY,JSON.stringify(state));
+}
+async function restoreDocumentFromCloud(row){
+  if(!row?.fileMediaId)return row;
+  if(row.fileId){try{const existing=await vaultGet(row.fileId);if(existing?.blob)return row}catch{}}
+  const blob=await downloadMediaBlob(row.fileMediaId);
+  if(!blob)return row;
+  const name=row.fileName||`JIGGY-Dokument-${row.id}`;
+  const file=new File([blob],name,{type:row.fileType||blob.type||"application/octet-stream"});
+  const saved=await vaultPut(file);
+  row.fileId=saved.id;row.fileName=saved.name;row.fileType=saved.type;row.fileSize=saved.size;
+  const mm=cloudMediaMap();mm[documentMediaMapKey(row.id)]={mediaId:row.fileMediaId,fingerprint:`${saved.name||""}:${saved.type||""}:${saved.size||0}:0`};saveCloudMediaMap(mm);
+  return row;
+}
+
+function logMediaMapKey(logId,itemId){return `log:${logId}:${itemId}`}
+async function uploadLogMedia(logRow,item,cloudId,fileRow){
+  if(!logRow||!item||!cloudId||!fileRow?.blob)return null;
+  const file=new File([fileRow.blob],fileRow.name||item.name||`jiggy-log-${item.id}`,{type:fileRow.type||item.type||"application/octet-stream"});
+  const fd=new FormData();fd.append("file",file);fd.append("mediaType","logbook");fd.append("vehicleId",cloudId);
+  const out=await authCloudRequest("/api/media",{method:"POST",body:fd});return out.media||null;
+}
+async function ensureCloudLogMedia(c,cloudId){
+  if(!c||!cloudId)return;
+  const mm=cloudMediaMap(),rows=(state.logs||[]).filter(x=>x&&x.carId===c.id);
+  let changed=false;
+  for(const row of rows){
+    for(const item of (row.media||[])){
+      try{
+        if(!item?.id)continue;
+        const local=await mediaGet(item.id);if(!local?.blob)continue;
+        const key=logMediaMapKey(row.id,item.id),fp=`${local.name||""}:${local.type||""}:${local.size||local.blob.size||0}:${local.created||0}`,known=mm[key];
+        if(known?.fingerprint===fp&&known?.mediaId){
+          if(item.mediaId!==known.mediaId){item.mediaId=known.mediaId;changed=true}
+          continue;
+        }
+        const media=await uploadLogMedia(row,item,cloudId,local);
+        if(media?.id){mm[key]={mediaId:media.id,fingerprint:fp};item.mediaId=media.id;changed=true}
+      }catch(e){console.warn("Logbook media upload",row.id,item?.id,e)}
+    }
+  }
+  saveCloudMediaMap(mm);
+  if(changed)localStorage.setItem(KEY,JSON.stringify(state));
+}
+async function restoreLogMediaFromCloud(logRow){
+  for(const item of (logRow?.media||[])){
+    if(!item?.mediaId)continue;
+    if(item.id){try{const existing=await mediaGet(item.id);if(existing?.blob)continue}catch{}}
+    try{
+      const blob=await downloadMediaBlob(item.mediaId);if(!blob)continue;
+      const name=item.name||`JIGGY-Logbuch-${item.id}`;
+      const file=new File([blob],name,{type:item.type||blob.type||"application/octet-stream"});
+      const saved=await mediaPut(file);
+      const oldId=item.id;
+      item.id=saved.id;item.name=saved.name;item.type=saved.type;item.size=saved.size;
+      const mm=cloudMediaMap();mm[logMediaMapKey(logRow.id,item.id)]={mediaId:item.mediaId,fingerprint:`${saved.name||""}:${saved.type||""}:${saved.size||0}:0`};
+      if(oldId&&oldId!==item.id)delete mm[logMediaMapKey(logRow.id,oldId)];
+      saveCloudMediaMap(mm);
+    }catch(e){console.warn("Logbook media download",logRow.id,item?.id,e)}
+  }
+  return logRow;
+}
+function vehicleCloudBundle(c,mediaId=null){
+  const id=c.id,own=x=>x&&x.carId===id,cloudCar={...c};
+  if(isDataImage(cloudCar.image))cloudCar.image="";
+  if(mediaId)cloudCar.imageMediaId=mediaId;else{const known=cloudMediaMap()[id]?.mediaId;if(known)cloudCar.imageMediaId=known}
+  const gallery=(state.gallery||[]).filter(own).map(x=>{const y={...x};if(isDataImage(y.image))y.image="";const known=cloudMediaMap()[galleryMediaMapKey(y.id)]?.mediaId;if(!y.imageMediaId&&known)y.imageMediaId=known;return y});
+  return{schemaVersion:8,localCarId:id,car:cloudCar,service:(state.service||[]).filter(own),legal:(state.legal||[]).filter(own),fuel:(state.fuel||[]).filter(own).map(x=>{const y={...x};const known=cloudMediaMap()[fuelReceiptMediaMapKey(y.id)]?.mediaId;if(!y.receiptMediaId&&known)y.receiptMediaId=known;return y}),builds:(state.builds||[]).filter(own),gallery,logs:(state.logs||[]).filter(own).map(row=>({...row,media:(row.media||[]).map(item=>{const y={...item};const known=cloudMediaMap()[logMediaMapKey(row.id,y.id)]?.mediaId;if(!y.mediaId&&known)y.mediaId=known;return y})})),documents:(state.documents||[]).filter(own).map(x=>{const y={...x};const known=cloudMediaMap()[documentMediaMapKey(y.id)]?.mediaId;if(!y.fileMediaId&&known)y.fileMediaId=known;return y}),reminders:(state.reminders||[]).filter(own)};
+}
+function bundleFingerprint(bundle){
+  const clean={...bundle};delete clean.syncedAt;
+  return JSON.stringify(clean);
+}
+async function applyCloudBundle(bundle){
+  if(!bundle?.car)return null;
+  const c={...bundle.car};const id=c.id||bundle.localCarId||uid();c.id=id;
+  if(c.imageMediaId&&!c.image){try{c.image=await downloadMediaDataUrl(c.imageMediaId);const mm=cloudMediaMap();mm[id]={mediaId:c.imageMediaId,fingerprint:`${c.image.length}:${c.image.slice(-64)}`};saveCloudMediaMap(mm)}catch(e){console.warn("Cover download",e)}}
+  const i=state.cars.findIndex(x=>x.id===id);if(i>=0)state.cars[i]=c;else state.cars.push(c);
+  for(const key of ["service","legal","builds","reminders"]){
+    state[key]=(state[key]||[]).filter(x=>x.carId!==id);
+    const rows=Array.isArray(bundle[key])?bundle[key].map(x=>({...x,carId:id})):[];state[key].push(...rows);
+  }
+  const localFuelBefore=(state.fuel||[]).filter(x=>x.carId===id);
+  state.fuel=(state.fuel||[]).filter(x=>x.carId!==id);
+  const fuelRows=Array.isArray(bundle.fuel)?bundle.fuel.map(x=>({...x,carId:id})):[];
+  const localFuelById=new Map(localFuelBefore.map(x=>[x.id,x]));
+  for(const row of fuelRows){
+    const local=localFuelById.get(row.id);
+    // Never discard a local receipt that has not reached cloud media yet.
+    if(local?.receiptFileId&&!row.receiptMediaId){row.receiptFileId=local.receiptFileId;row.receiptFileName=local.receiptFileName;row.receiptFileType=local.receiptFileType;row.receiptFileSize=local.receiptFileSize}
+    if(row.receiptMediaId){try{await restoreFuelReceiptFromCloud(row)}catch(e){console.warn("Fuel receipt download",row.id,e)}}
+    state.fuel.push(row);
+  }
+  for(const local of localFuelBefore){if(!fuelRows.some(x=>x.id===local.id))state.fuel.push(local)}
+  const localLogsBefore=(state.logs||[]).filter(x=>x.carId===id);
+  state.logs=(state.logs||[]).filter(x=>x.carId!==id);
+  const logRows=Array.isArray(bundle.logs)?bundle.logs.map(x=>({...x,carId:id})):[];
+  const localLogsById=new Map(localLogsBefore.map(x=>[x.id,x]));
+  for(const row of logRows){
+    const local=localLogsById.get(row.id);
+    if(local?.media?.length){
+      const cloudMediaById=new Map((row.media||[]).map(x=>[x.id,x]));
+      for(const lm of local.media){
+        const cm=cloudMediaById.get(lm.id);
+        if(cm){if(!cm.mediaId&&lm.mediaId)cm.mediaId=lm.mediaId}
+        else (row.media||(row.media=[])).push(lm);
+      }
+    }
+    try{await restoreLogMediaFromCloud(row)}catch(e){console.warn("Logbook restore",row.id,e)}
+    state.logs.push(row);
+  }
+  for(const local of localLogsBefore){if(!logRows.some(x=>x.id===local.id))state.logs.push(local)}
+  const localDocumentsBefore=(state.documents||[]).filter(x=>x.carId===id);
+  state.documents=(state.documents||[]).filter(x=>x.carId!==id);
+  const documentRows=Array.isArray(bundle.documents)?bundle.documents.map(x=>({...x,carId:id})):[];
+  const localDocumentsById=new Map(localDocumentsBefore.map(x=>[x.id,x]));
+  for(const row of documentRows){
+    const local=localDocumentsById.get(row.id);
+    // Never discard a local Vault file that has not reached cloud media yet.
+    if(local?.fileId&&!row.fileMediaId){row.fileId=local.fileId;row.fileName=local.fileName;row.fileType=local.fileType;row.fileSize=local.fileSize}
+    if(row.fileMediaId){try{await restoreDocumentFromCloud(row)}catch(e){console.warn("Document download",row.id,e)}}
+    state.documents.push(row);
+  }
+  for(const local of localDocumentsBefore){if(!documentRows.some(x=>x.id===local.id))state.documents.push(local)}
+  const localGalleryBefore=(state.gallery||[]).filter(x=>x.carId===id&&isDataImage(x.image));
+  state.gallery=(state.gallery||[]).filter(x=>x.carId!==id);
+  let galleryRows=Array.isArray(bundle.gallery)?bundle.gallery.map(x=>({...x,carId:id})):[];
+  // Safety migration: an old/empty cloud gallery must never erase unsynced local originals.
+  if(!galleryRows.some(x=>x.imageMediaId)&&localGalleryBefore.length){
+    const byId=new Map(galleryRows.map(x=>[x.id,x]));
+    for(const localPhoto of localGalleryBefore){
+      const existing=byId.get(localPhoto.id);
+      if(existing)Object.assign(existing,localPhoto,{carId:id});
+      else galleryRows.push({...localPhoto,carId:id});
+    }
+  }
+  for(const photo of galleryRows){
+    if(photo.imageMediaId&&!photo.image){
+      try{
+        photo.image=await downloadMediaDataUrl(photo.imageMediaId);
+        const mm=cloudMediaMap();mm[galleryMediaMapKey(photo.id)]={mediaId:photo.imageMediaId,fingerprint:`${photo.image.length}:${photo.image.slice(-64)}`};saveCloudMediaMap(mm);
+      }catch(e){console.warn("Gallery download",photo.id,e)}
+    }
+    state.gallery.push(photo);
+  }
+  if(!state.activeCarId)state.activeCarId=id;
+  return id;
+}
+function scheduleCloudSync(delay=1200){
+  if(!accountSession().token||cloudSyncApplying)return;
+  clearTimeout(cloudSyncTimer);cloudSyncTimer=setTimeout(()=>syncCloudGarage({silent:true}),delay);
+}
+async function syncCloudGarage({silent=false}={}){
+  if(cloudSyncRunning||!accountSession().token)return;
+  cloudSyncRunning=true;if(!silent)setImportMessage("Garage wird synchronisiert …");setCloudConnectionState("syncing");
+  try{
+    const remote=await authCloudRequest("/api/garage/vehicles"),rows=remote.vehicles||[],map=cloudMap(),meta=syncMeta();
+    let pushed=0,pulled=0,created=0,conflicts=0;
+    const remoteById=new Map(rows.map(r=>[r.id,r]));
+    cloudSyncApplying=true;
+    // Existing local vehicles: create, push, pull or detect a real two-sided conflict.
+    for(const c of [...state.cars]){
+      const localId=c.id;let cloudId=map[localId];let row=cloudId?remoteById.get(cloudId):null;
+      if(!row){
+        // Recover mappings on a new installation/device by the stable localCarId stored in the bundle.
+        row=rows.find(r=>r.data?.localCarId===localId);if(row){cloudId=row.id;map[localId]=cloudId}
+      }
+      if(cloudId&&isDataImage(c.image))await ensureCloudCover(c,cloudId);
+      if(cloudId)await ensureCloudGallery(c,cloudId);
+      if(cloudId)await ensureCloudFuelReceipts(c,cloudId);
+      if(cloudId)await ensureCloudDocuments(c,cloudId);
+      if(cloudId)await ensureCloudLogMedia(c,cloudId);
+      const localBundle=vehicleCloudBundle(c),localFp=bundleFingerprint(localBundle);
+      if(!row){
+        const out=await authCloudRequest("/api/garage/vehicles",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...localBundle,syncedAt:new Date().toISOString()})});
+        if(out.vehicle?.id){cloudId=out.vehicle.id;map[localId]=cloudId;const mediaId=await ensureCloudCover(c,cloudId);await ensureCloudGallery(c,cloudId);await ensureCloudFuelReceipts(c,cloudId);await ensureCloudDocuments(c,cloudId);await ensureCloudLogMedia(c,cloudId);const finalBundle=vehicleCloudBundle(c,mediaId);const updated=await authCloudRequest(`/api/garage/vehicles/${encodeURIComponent(cloudId)}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({...finalBundle,syncedAt:new Date().toISOString()})});meta[localId]={fingerprint:bundleFingerprint(finalBundle),cloudUpdatedAt:updated.vehicle?.updatedAt||out.vehicle.updatedAt||null};created++}continue;
+      }
+      const m=meta[localId]||{},remoteFp=bundleFingerprint(row.data||{}),localChanged=!!m.fingerprint&&localFp!==m.fingerprint,remoteChanged=!!m.cloudUpdatedAt&&row.updatedAt!==m.cloudUpdatedAt;
+      if(!m.fingerprint){
+        // First sync after Beta 2 import: matching content establishes baseline; otherwise prefer local once.
+        if(localFp===remoteFp){meta[localId]={fingerprint:localFp,cloudUpdatedAt:row.updatedAt};continue}
+        await authCloudRequest(`/api/garage/vehicles/${encodeURIComponent(cloudId)}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({...localBundle,syncedAt:new Date().toISOString()})});pushed++;
+        meta[localId]={fingerprint:localFp,cloudUpdatedAt:new Date().toISOString()};continue;
+      }
+      if(localChanged&&remoteChanged&&localFp!==remoteFp){conflicts++;continue}
+      if(remoteChanged&&!localChanged){const id=await applyCloudBundle(row.data);if(id){const fp=bundleFingerprint(vehicleCloudBundle(state.cars.find(x=>x.id===id)));meta[id]={fingerprint:fp,cloudUpdatedAt:row.updatedAt};map[id]=cloudId;pulled++}continue}
+      if(localChanged){const out=await authCloudRequest(`/api/garage/vehicles/${encodeURIComponent(cloudId)}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({...localBundle,syncedAt:new Date().toISOString()})});meta[localId]={fingerprint:localFp,cloudUpdatedAt:out.vehicle?.updatedAt||new Date().toISOString()};pushed++;continue}
+      meta[localId]={fingerprint:localFp,cloudUpdatedAt:row.updatedAt};
+    }
+    // Cloud-only vehicles (e.g. created/changed on iPhone later) are imported locally.
+    const mappedCloudIds=new Set(Object.values(map));
+    for(const row of rows){
+      if(mappedCloudIds.has(row.id))continue;
+      const bundle=row.data||{};if(!bundle.car)continue;
+      const id=await applyCloudBundle(bundle);if(id){map[id]=row.id;meta[id]={fingerprint:bundleFingerprint(vehicleCloudBundle(state.cars.find(x=>x.id===id))),cloudUpdatedAt:row.updatedAt};pulled++}
+    }
+    localStorage.setItem(KEY,JSON.stringify(state));saveCloudMap(map);saveSyncMeta(meta);cloudSyncApplying=false;
+    if(pulled)render();if($("cloudVehicleCount"))$("cloudVehicleCount").textContent=String(rows.length+created);
+    if(conflicts)setImportMessage(`${conflicts} Sync-Konflikt${conflicts===1?"":"e"} erkannt – nichts wurde überschrieben.`,"bad");
+    else setImportMessage(`Auto-Sync aktiv · ${created+pushed} hochgeladen · ${pulled} vom Server übernommen`,"good");
+    setCloudConnectionState("online");
+  }catch(e){cloudSyncApplying=false;setCloudConnectionState("offline");if(!silent)setImportMessage("Sync fehlgeschlagen: "+e.message,"bad")}
+  finally{cloudSyncRunning=false}
+}
+async function refreshCloudGarage(){try{const data=await authCloudRequest("/api/garage/vehicles");setCloudConnectionState("online");const rows=data.vehicles||[];if($("cloudVehicleCount"))$("cloudVehicleCount").textContent=String(rows.length);return rows}catch(e){await checkCloudConnection();setImportMessage("Cloud konnte nicht geladen werden: "+e.message,"bad");return[]}}
+async function importLocalGarage(){setImportMessage("Starte sicheren Zwei-Wege-Sync …");await syncCloudGarage();toast("JIGGY Cloud synchronisiert")}
+$("accountLoginTab")?.addEventListener("click",()=>setAccountMode("login"));
+$("accountRegisterTab")?.addEventListener("click",()=>setAccountMode("register"));
+$("accountForm")?.addEventListener("submit",async e=>{e.preventDefault();const btn=$("accountSubmit"),email=$("accountEmail").value.trim(),password=$("accountPassword").value,displayName=$("accountDisplayName")?.value.trim()||"";btn.disabled=true;btn.textContent=accountMode==="register"?"Erstelle …":"Anmelden …";try{const body=accountMode==="register"?{email,password,displayName}:{email,password};const out=await cloudRequest(`/api/auth/${accountMode==="register"?"register":"login"}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});switchLocalGarageToAccount(out.user);saveAccountSession({token:out.token,user:out.user});$("accountPassword").value="";renderAccount(out.user);toast(accountMode==="register"?"JIGGY Account erstellt":"Willkommen zurück");await syncCloudGarage();await refreshPublicProfileAccountState()}catch(err){setAccountMessage(err.message,"bad")}finally{btn.disabled=false;btn.textContent=accountMode==="register"?"Account erstellen":"Anmelden"}});
+$("accountLogout")?.addEventListener("click",()=>{logoutLocalAccount();const p=profileConfig();saveProfileConfig({...p,profileId:"",editToken:""});renderAccount();renderPublicProfile();if($("cloudVehicleCount"))$("cloudVehicleCount").textContent="–";setAccountMode("login");toast("Abgemeldet · lokale Garage ausgeblendet","warn")});
+$("cloudImport")?.addEventListener("click",()=>syncCloudGarage());
+async function initJiggyAccount(){setAccountMode("login");renderAccount();await checkCloudConnection();if(!accountSession().token)return;try{const out=await authCloudRequest("/api/auth/me");switchLocalGarageToAccount(out.user);saveAccountSession({...accountSession(),user:out.user});renderAccount(out.user);await syncCloudGarage();await refreshPublicProfileAccountState()}catch(e){logoutLocalAccount();renderAccount();setAccountMessage("Sitzung abgelaufen. Bitte erneut anmelden.","bad")}}
+setTimeout(initJiggyAccount,700);
+setInterval(()=>{checkCloudConnection();if(accountSession().token)syncCloudGarage({silent:true})},60000);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden){checkCloudConnection();if(accountSession().token)syncCloudGarage({silent:true})}});
+
 /* Public Profile · JIGGY Cloud */
 const JIGGY_CLOUD={apiUrl:"https://api.jiggy-cloud.org",baseUrl:"https://xigriffen.github.io/MyGarage/"};
 function profileConfig(){try{return JSON.parse(localStorage.getItem(PROFILE_KEY)||"{}")}catch{return{}}}
 function saveProfileConfig(v){localStorage.setItem(PROFILE_KEY,JSON.stringify(v))}
+async function refreshPublicProfileAccountState(){
+  const p=profileConfig();
+  if(!accountSession().token){saveProfileConfig({...p,profileId:"",editToken:""});renderPublicProfile();return null}
+  try{
+    const out=await authCloudRequest("/api/profiles/me");
+    if(out.published&&out.id){
+      const cloud=out.profile||{};
+      saveProfileConfig({
+        ...p,
+        profileId:out.id,
+        editToken:"",
+        displayName:typeof cloud.displayName==="string"?cloud.displayName:(p.displayName||""),
+        bio:typeof cloud.bio==="string"?cloud.bio:(p.bio||""),
+        theme:cloud.theme||p.theme||"signature"
+      });
+    } else saveProfileConfig({...p,profileId:"",editToken:""});
+    renderPublicProfile();return out
+  }catch(e){console.error("Public profile status error:",e);return null}
+}
 async function publicImageData(c){
   const src=c&&(c.image||c.exampleImage);if(!src||!$("profileGallery")?.checked)return"";
   try{const img=new Image();img.src=src;await img.decode();const max=1100,scale=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight)),w=Math.max(1,Math.round(img.naturalWidth*scale)),h=Math.max(1,Math.round(img.naturalHeight*scale)),cv=document.createElement("canvas");cv.width=w;cv.height=h;cv.getContext("2d").drawImage(img,0,0,w,h);return cv.toDataURL("image/jpeg",.78)}catch{return""}
@@ -671,19 +1131,33 @@ function renderPublicProfile(){
   if(!$("profilePreview"))return;loadProfileInputs();const c=car($("profileCar")?.value),cfg=profileConfig();if(!c){$("profilePreview").innerHTML='<div class="log-empty">Lege zuerst ein Fahrzeug an.</div>';return}
   const mods=$("profileMods")?.checked?(state.builds||[]).filter(x=>x.carId===c.id&&x.status==="Verbaut").slice(0,4):[],img=$("profileGallery")?.checked?(c.image||c.exampleImage):"";
   $("profilePreview").innerHTML=`<div class="public-preview-shell theme-${esc($("profileTheme")?.value||"signature")}"><div class="public-preview-image">${img?`<img src="${img}" alt="">`:'<div class="profile-fallback">JIGGY.</div>'}<span>JIGGY PROFILE</span></div><div class="public-preview-copy"><small>YOUR CAR. YOUR STORY.</small><h2>${esc($("profileName")?.value.trim()||cname(c))}</h2><p>${esc($("profileBio")?.value.trim()||"Dieses Fahrzeug lebt in JIGGY.")}</p>${$("profileSpecs")?.checked?`<div class="public-specs"><b>${c.power||"—"}<span>PS</span></b><b>${c.torque||"—"}<span>NM</span></b><b>${c.year||"—"}<span>YEAR</span></b></div>`:""}${($("profileMileage")?.checked||$("profilePlate")?.checked)?`<div class="public-profile-details">${$("profileMileage")?.checked?`<span><small>KILOMETERSTAND</small><strong>${num(c.km)} km</strong></span>`:""}${$("profilePlate")?.checked?`<span><small>KENNZEICHEN</small><strong>${esc(c.plate||"—")}</strong></span>`:""}</div>`:""}${mods.length?`<div class="public-mods">${mods.map(x=>`<span>${esc(x.name)}</span>`).join("")}</div>`:""}</div></div>`;
-  const published=!!cfg.profileId;$("profileStatusText").textContent=published?"Veröffentlicht":"Nicht veröffentlicht";$("profileStatusOrb").classList.toggle("online",published);$("copyProfileBtn").disabled=!published;$("unpublishProfileBtn").disabled=!published;
+  const published=!!accountSession().token&&!!cfg.profileId;$("profileStatusText").textContent=published?"Veröffentlicht":"Nicht veröffentlicht";$("profileStatusOrb").classList.toggle("online",published);$("copyProfileBtn").disabled=!published;$("unpublishProfileBtn").disabled=!published;if($("publishProfileBtn"))$("publishProfileBtn").textContent=published?"Änderungen speichern":"Profil veröffentlichen";
 }
 ["profileName","profileBio","profileTheme","profileSpecs","profileMileage","profilePlate","profileMods","profileGallery"].forEach(id=>$(id)?.addEventListener(id.includes("Name")||id.includes("Bio")?"input":"change",()=>{saveProfileConfig(localProfileSettings());renderPublicProfile()}));
 $("profileCar")?.addEventListener("change",renderPublicProfile);
 async function cloudRequest(path,options={}){const r=await fetch(JIGGY_CLOUD.apiUrl+path,options);const text=await r.text();let data={};try{data=text?JSON.parse(text):{}}catch{}if(!r.ok)throw new Error(data.error||text.slice(0,180)||`HTTP ${r.status}`);return data}
 $("publishProfileBtn")?.addEventListener("click",async()=>{
-  const c=car($("profileCar").value),btn=$("publishProfileBtn"),status=$("profilePublishStatus");if(!c)return toast("Kein Fahrzeug ausgewählt","warn");let p=profileConfig();btn.disabled=true;btn.textContent=p.profileId?"Aktualisiere …":"Veröffentliche …";status.textContent="Profilbild wird vorbereitet …";
-  try{const image=await publicImageData(c),payload=profilePayload(c,image);if(p.profileId&&p.editToken){await cloudRequest(`/api/profiles/${encodeURIComponent(p.profileId)}`,{method:"PUT",headers:{"Content-Type":"application/json","Authorization":`Bearer ${p.editToken}`},body:JSON.stringify(payload)})}else{const created=await cloudRequest("/api/profiles",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});p={...p,profileId:created.id,editToken:created.editToken}}
-    p={...p,...localProfileSettings(),carId:c.id,publishedAt:new Date().toISOString()};saveProfileConfig(p);status.textContent="Profil ist online. Link kann jetzt geteilt werden.";status.className="profile-publish-status good";toast("JIGGY-Profil veröffentlicht");renderPublicProfile()
-  }catch(e){console.error(e);status.textContent="Veröffentlichung fehlgeschlagen: "+e.message;status.className="profile-publish-status bad"}finally{btn.disabled=false;btn.textContent="Profil veröffentlichen"}
+  const c=car($("profileCar").value),btn=$("publishProfileBtn"),status=$("profilePublishStatus");
+  if(!c)return toast("Kein Fahrzeug ausgewählt","warn");
+  if(!accountSession().token)return toast("Bitte zuerst mit deinem JIGGY Account anmelden","warn");
+  let p=profileConfig();btn.disabled=true;btn.textContent=p.profileId?"Aktualisiere …":"Veröffentliche …";status.textContent="Profilbild wird vorbereitet …";
+  try{
+    const image=await publicImageData(c),payload=profilePayload(c,image);
+    const out=await authCloudRequest("/api/profiles",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+    p={...p,...localProfileSettings(),profileId:out.id,editToken:"",carId:c.id,publishedAt:new Date().toISOString()};
+    saveProfileConfig(p);status.textContent="Profil ist online. Link kann jetzt geteilt werden.";status.className="profile-publish-status good";toast("JIGGY-Profil veröffentlicht");renderPublicProfile();
+  }catch(e){console.error(e);status.textContent="Veröffentlichung fehlgeschlagen: "+e.message;status.className="profile-publish-status bad"}
+  finally{btn.disabled=false;btn.textContent=profileConfig().profileId?"Änderungen speichern":"Profil veröffentlichen"}
 });
-$("copyProfileBtn")?.addEventListener("click",async()=>{const p=profileConfig();if(!p.profileId)return;const url=`${JIGGY_CLOUD.baseUrl}${JIGGY_CLOUD.baseUrl.includes("?")?"&":"?"}id=${encodeURIComponent(p.profileId)}`;try{await navigator.clipboard.writeText(url);toast("Profil-Link kopiert")}catch{prompt("Profil-Link:",url)}});
-$("unpublishProfileBtn")?.addEventListener("click",async()=>{const p=profileConfig();if(!p.profileId||!p.editToken||!confirm("Öffentliches Profil wirklich offline nehmen?"))return;try{await cloudRequest(`/api/profiles/${encodeURIComponent(p.profileId)}`,{method:"DELETE",headers:{"Authorization":`Bearer ${p.editToken}`}});saveProfileConfig({...p,profileId:"",editToken:""});$("profilePublishStatus").textContent="Profil wurde offline genommen.";toast("Profil offline","warn");renderPublicProfile()}catch(e){$("profilePublishStatus").textContent="Löschen fehlgeschlagen: "+e.message}});
+$("copyProfileBtn")?.addEventListener("click",async()=>{
+  const p=profileConfig();if(!accountSession().token||!p.profileId)return;
+  const url=`${JIGGY_CLOUD.baseUrl}${JIGGY_CLOUD.baseUrl.includes("?")?"&":"?"}id=${encodeURIComponent(p.profileId)}`;
+  try{if(window.myGarageDesktop?.copyText){const r=await window.myGarageDesktop.copyText(url);if(!r?.ok)throw new Error(r?.error||"Kopieren fehlgeschlagen")}else if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(url)}else throw new Error("Clipboard nicht verfügbar");toast("Profil-Link kopiert")}catch{prompt("Profil-Link:",url)}
+});
+$("unpublishProfileBtn")?.addEventListener("click",async()=>{
+  const p=profileConfig();if(!accountSession().token||!p.profileId||!confirm("Öffentliches Profil wirklich offline nehmen?"))return;
+  try{await authCloudRequest("/api/profiles/me",{method:"DELETE"});saveProfileConfig({...p,profileId:"",editToken:""});$("profilePublishStatus").textContent="Profil wurde offline genommen.";$("profilePublishStatus").className="profile-publish-status good";toast("Profil offline","warn");renderPublicProfile()}catch(e){$("profilePublishStatus").textContent="Löschen fehlgeschlagen: "+e.message;$("profilePublishStatus").className="profile-publish-status bad"}
+});
 
 function render(){refreshSelectors();renderHome();renderExtras();renderGallery();renderLists();renderStats();renderVault();renderReminderManager();renderPublicProfile()}
 $("exportBtn").onclick=()=>{const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="JIGGY_Backup.json";a.click();URL.revokeObjectURL(a.href)}
