@@ -1,7 +1,0 @@
-JIGGY 1.9.3 — Poster Studio Pro
-- Poster layout rebuilt in the approved mockup direction.
-- Long vehicle titles auto-fit/wrap instead of clipping.
-- Much larger specs and installed-mod text.
-- Zoom, horizontal/vertical image positioning and accent color controls.
-- Separate 4:5 Clean/Performance and 9:16 Story compositions.
-- TÜV/ABE editing remains intact.
