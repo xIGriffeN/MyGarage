@@ -1,41 +1,31 @@
-name: Build MyGarage Windows Release
+name: Build JIGGY
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - "v*"
-
-permissions:
-  contents: write
 
 jobs:
   build-windows:
     runs-on: windows-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Node installieren
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: 20
+          cache: npm
 
-      - name: Abhängigkeiten installieren
+      - name: Clean dist
+        shell: powershell
+        run: |
+          if (Test-Path dist) {
+            Remove-Item dist -Recurse -Force
+          }
+
+      - name: Install dependencies
         run: npm ci
 
-      - name: Windows Setup bauen
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build JIGGY
         run: npm run dist
-
-      - name: Dateien zum GitHub Release hochladen
-        if: startsWith(github.ref, 'refs/tags/')
-        shell: powershell
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          Get-ChildItem ".\dist" -File | ForEach-Object {
-            gh release upload "${{ github.ref_name }}" $_.FullName --clobber
-          }
