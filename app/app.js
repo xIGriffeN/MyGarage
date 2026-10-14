@@ -80,7 +80,7 @@ function closeMedia(){$("mediaLightbox")?.classList.remove("open");$("mediaLight
 window.closeMedia=closeMedia;
 async function deleteLog(id){const x=(state.logs||[]).find(v=>v.id===id);if(!x||!confirm("Diesen Logbuch-Eintrag wirklich löschen?"))return;for(const m of x.media||[]){try{await mediaDelete(m.id)}catch{}}state.logs=state.logs.filter(v=>v.id!==id);save();toast("Logbuch-Eintrag gelöscht","warn");renderLogbook()}
 
-function blank(){return{cars:[],service:[],legal:[],fuel:[],builds:[],gallery:[],logs:[],documents:[],reminders:[],activeCarId:null}}
+function blank(){return{cars:[],service:[],legal:[],fuel:[],fuelPrices:[],fuelVouchers:[],builds:[],gallery:[],logs:[],documents:[],reminders:[],activeCarId:null}}
 function load(){
   try{
     let raw=localStorage.getItem(KEY)
@@ -100,6 +100,8 @@ function load(){
     s.service=old.service||old.services||[];
     s.legal=old.legal||[];
     s.fuel=old.fuel||[];
+    s.fuelPrices=old.fuelPrices||[];
+    s.fuelVouchers=old.fuelVouchers||[];
     s.builds=old.builds||[];s.gallery=old.gallery||[];s.logs=old.logs||[];s.documents=old.documents||[];s.reminders=old.reminders||[];
     s.activeCarId=old.activeCarId||s.cars[0]?.id||null;
     return s
@@ -161,8 +163,8 @@ function show(view){
   document.querySelectorAll(".nav").forEach(v=>v.classList.remove("active"));
   $(view+"View")?.classList.add("active");
   document.querySelector(`.nav[data-view="${view}"]`)?.classList.add("active");
-  const titles={home:"Übersicht",cars:"Fahrzeuge",service:"Service",legal:"TÜV & ABE",fuel:"Tankbuch",build:"Umbauten",logbook:"Logbuch",stats:"Statistiken",vault:"Dokumente",reminders:"Erinnerungen",profile:"Public Profile",more:"Mehr"};
-  const subs={home:"Alles Wichtige zu deinem Fahrzeug auf einen Blick.",cars:"Fahrzeuge hinzufügen, auswählen und verwalten.",service:"Wartung und nächste Termine übersichtlich festhalten.",legal:"ABE, Eintragungen und TÜV-Themen einfach dokumentieren.",fuel:"Tankungen und Kraftstoffkosten im Blick behalten.",build:"Geplante und verbaute Umbauten verwalten.",logbook:"Deine Umbauten und Veränderungen als Foto- und Video-Chronik.",stats:"Kosten, Verbrauch und Entwicklung deiner Garage.",vault:"Rechnungen, ABEs und Fahrzeugunterlagen lokal archivieren.",reminders:"Termine und Kilometer-Intervalle nie mehr verpassen.",profile:"Ein öffentliches Fahrzeugprofil mit eigenem Share-Link.",more:"Backup und selten benötigte Funktionen."};
+  const titles={home:"Übersicht",cars:"Fahrzeuge",service:"Service",legal:"TÜV & ABE",fuel:"Tankbuch",build:"Umbauten",logbook:"Logbuch",stats:"Statistiken",jobs:"Jobs",vault:"Dokumente",reminders:"Erinnerungen",spots:"Spots",profile:"Public Profile",more:"Mehr"};
+  const subs={home:"Alles Wichtige zu deinem Fahrzeug auf einen Blick.",cars:"Fahrzeuge hinzufügen, auswählen und verwalten.",service:"Wartung und nächste Termine übersichtlich festhalten.",legal:"ABE, Eintragungen und TÜV-Themen einfach dokumentieren.",fuel:"Tankungen und Kraftstoffkosten im Blick behalten.",build:"Geplante und verbaute Umbauten verwalten.",logbook:"Deine Umbauten und Veränderungen als Foto- und Video-Chronik.",stats:"Kosten, Verbrauch und Entwicklung deiner Garage.",jobs:"Arbeitsaufträge, Stunden, Material, Zahlungen und Rechnungen.",vault:"Rechnungen, ABEs und Fahrzeugunterlagen lokal archivieren.",reminders:"Termine und Kilometer-Intervalle nie mehr verpassen.",profile:"Ein öffentliches Fahrzeugprofil mit eigenem Share-Link.",more:"Backup und selten benötigte Funktionen."};
   $("pageTitle").textContent=titles[view]||"MyGarage"; $("pageSub").textContent=subs[view]||"";
   $("sidebar").classList.remove("open");
   refreshSelectors();
@@ -174,7 +176,7 @@ function show(view){
   renderPublicProfile();
   syncSidebarGroups(view);
 }
-document.querySelectorAll(".nav[data-view]").forEach(b=>b.onclick=()=>show(b.dataset.view));
+document.querySelectorAll(".nav[data-view]").forEach(b=>b.onclick=()=>{show(b.dataset.view);if(b.dataset.view==="spots")setTimeout(initSpotsView,40);if(b.dataset.view==="jobs")setTimeout(initJobsView,20);if(b.dataset.view==="profile")setTimeout(loadProfileSlug,20);if(b.dataset.view==="more")setTimeout(loadInvoiceSettings,20)});
 document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>show(b.dataset.go));
 $("mobileMenu").onclick=()=>$("sidebar").classList.toggle("open");
 
@@ -357,13 +359,469 @@ $("legalForm").onsubmit=e=>{
   const wasEdit=!!entry;
   save();resetLegalEditor();toast(wasEdit?"Eintrag aktualisiert":(type==="HU"?"TÜV / HU gespeichert":"ABE / Eintragung gespeichert"));render()
 };
+function fuelUnitPrice(cost,liters){
+  const c=Number(cost||0),l=Number(liters||0);
+  return l>0?c/l:0;
+}
+function fuelPriceText(v){
+  return Number(v||0).toLocaleString("de-DE",{minimumFractionDigits:3,maximumFractionDigits:3})+" €/l";
+}
+function fuelVoucherBalanceText(v){return money(Number(v||0))}
+function fuelVoucherById(id){return (state.fuelVouchers||[]).find(x=>x.id===id)||null}
+
+function refreshFuelVoucherSelect(){
+  const el=$("fuelVoucher");if(!el)return;
+  const old=el.value;
+  const rows=[...(state.fuelVouchers||[])].filter(x=>Number(x.balance||0)>0);
+  el.innerHTML='<option value="">Kein Gutschein</option>'+rows.map(x=>`<option value="${esc(x.id)}">${esc(x.provider||"Gutschein")} · ${money(x.balance||0)}</option>`).join("");
+  if(rows.some(x=>x.id===old))el.value=old;
+  renderFuelVoucherHint();
+}
+function renderFuelVoucherHint(){
+  const hint=$("fuelVoucherHint"),v=fuelVoucherById($("fuelVoucher")?.value);
+  if(!hint)return;
+  hint.textContent=v
+    ? `${v.provider||"Gutschein"}: ${money(v.balance||0)} Restguthaben${v.expiry?` · gültig bis ${fmtDate(v.expiry)}`:""}`
+    : "Optional. Das Restguthaben wird beim Speichern automatisch reduziert.";
+}
+function updateFuelCalculatedPrice(){
+  const out=$("fuelCalculatedPrice");if(!out)return;
+  const p=fuelUnitPrice($("fuelCost")?.value,$("fuelLiters")?.value);
+  out.textContent=p?fuelPriceText(p):"–";
+}
+$("fuelCost")?.addEventListener("input",updateFuelCalculatedPrice);
+$("fuelLiters")?.addEventListener("input",updateFuelCalculatedPrice);
+$("fuelVoucher")?.addEventListener("change",()=>{
+  renderFuelVoucherHint();
+  const v=fuelVoucherById($("fuelVoucher").value);
+  if(v){
+    const cost=Number($("fuelCost")?.value||0);
+    $("fuelVoucherAmount").value=Math.min(cost||0,Number(v.balance||0)).toFixed(2);
+  }
+});
+
 $("fuelForm").onsubmit=async e=>{
-  e.preventDefault();if(!state.cars.length)return alert("Bitte zuerst ein Fahrzeug anlegen.");
-  const id=$("fuelCar").value,km=+$("fuelKm").value||0,file=$("fuelReceipt")?.files?.[0];let receipt=null;
-  if(file){if(file.size>15*1024*1024)return toast("Tankbeleg ist größer als 15 MB","warn");try{receipt=await vaultPut(file)}catch(err){console.error(err);return toast("Tankbeleg konnte nicht gespeichert werden","warn")}}
-  state.fuel.push({id:uid(),carId:id,date:$("fuelDate").value,km,liters:+$("fuelLiters").value||0,cost:+$("fuelCost").value||0,receiptFileId:receipt?.id||"",receiptFileName:receipt?.name||"",receiptFileType:receipt?.type||"",receiptFileSize:receipt?.size||0});
-  let c=car(id);if(c&&km>+c.km)c.km=km;save();e.target.reset();$("fuelDate").value=today();toast(receipt?"Tankung + Beleg gespeichert":"Tankung gespeichert");render()
+  e.preventDefault();
+  if(!state.cars.length)return alert("Bitte zuerst ein Fahrzeug anlegen.");
+
+  const id=$("fuelCar").value,
+        km=+$("fuelKm").value||0,
+        liters=+$("fuelLiters").value||0,
+        cost=+$("fuelCost").value||0,
+        file=$("fuelReceipt")?.files?.[0];
+
+  let receipt=null;
+  if(file){
+    if(file.size>15*1024*1024)return toast("Tankbeleg ist größer als 15 MB","warn");
+    try{receipt=await vaultPut(file)}
+    catch(err){console.error(err);return toast("Tankbeleg konnte nicht gespeichert werden","warn")}
+  }
+
+  const voucherId=$("fuelVoucher")?.value||"";
+  const voucher=fuelVoucherById(voucherId);
+  let voucherAmount=Number($("fuelVoucherAmount")?.value||0);
+
+  if(voucher){
+    voucherAmount=Math.max(0,Math.min(voucherAmount,cost,Number(voucher.balance||0)));
+    voucher.balance=Math.round((Number(voucher.balance||0)-voucherAmount)*100)/100;
+    voucher.updated=Date.now();
+  }else{
+    voucherAmount=0;
+  }
+
+  const unitPrice=fuelUnitPrice(cost,liters);
+
+  state.fuel.push({
+    id:uid(),
+    carId:id,
+    date:$("fuelDate").value,
+    km,
+    liters,
+    cost,
+    fuelType:$("fuelType")?.value||"",
+    station:$("fuelStation")?.value.trim()||"",
+    unitPrice,
+    voucherId:voucher?.id||"",
+    voucherProvider:voucher?.provider||"",
+    voucherAmount,
+    cashAmount:Math.max(0,Math.round((cost-voucherAmount)*100)/100),
+    receiptFileId:receipt?.id||"",
+    receiptFileName:receipt?.name||"",
+    receiptFileType:receipt?.type||"",
+    receiptFileSize:receipt?.size||0
+  });
+
+  let c=car(id);
+  if(c&&km>+c.km)c.km=km;
+
+  save();
+  e.target.reset();
+  $("fuelDate").value=today();
+  $("fuelVoucherAmount").value="0";
+  updateFuelCalculatedPrice();
+  refreshFuelVoucherSelect();
+  toast(receipt?"Tankung + Beleg gespeichert":"Tankung gespeichert");
+  render();
 };
+
+$("fuelPriceDate") && ($("fuelPriceDate").value=today());
+$("fuelPriceForm")?.addEventListener("submit",e=>{
+  e.preventDefault();
+  const station=$("fuelPriceStation").value.trim();
+  const price=Number($("fuelPriceValue").value);
+  if(!station||!Number.isFinite(price)||price<=0)return toast("Bitte Tankstelle und gültigen Preis eintragen","warn");
+  state.fuelPrices=state.fuelPrices||[];
+  state.fuelPrices.push({
+    id:uid(),
+    station,
+    fuelType:$("fuelPriceType").value,
+    price,
+    location:$("fuelPriceLocation").value.trim(),
+    date:$("fuelPriceDate").value||today(),
+    created:Date.now()
+  });
+  save();e.target.reset();$("fuelPriceDate").value=today();toast("Tankpreis gespeichert");renderFuelHub()
+});
+
+$("fuelVoucherForm")?.addEventListener("submit",e=>{
+  e.preventDefault();
+  const provider=$("fuelVoucherProvider").value.trim();
+  const balance=Number($("fuelVoucherBalance").value);
+  if(!provider||!Number.isFinite(balance)||balance<0)return toast("Bitte Anbieter und gültiges Guthaben eintragen","warn");
+  state.fuelVouchers=state.fuelVouchers||[];
+  state.fuelVouchers.push({
+    id:uid(),
+    provider,
+    name:$("fuelVoucherName").value.trim(),
+    initialBalance:balance,
+    balance,
+    expiry:$("fuelVoucherExpiry").value||"",
+    code:$("fuelVoucherCode").value.trim(),
+    note:$("fuelVoucherNote").value.trim(),
+    created:Date.now()
+  });
+  save();e.target.reset();toast("Tankgutschein gespeichert");renderFuelHub()
+});
+
+window.delFuelPrice=id=>{
+  state.fuelPrices=(state.fuelPrices||[]).filter(x=>x.id!==id);save();renderFuelHub()
+};
+window.delFuelVoucher=id=>{
+  const used=(state.fuel||[]).some(x=>x.voucherId===id);
+  if(used&&!confirm("Dieser Gutschein wurde bereits bei Tankungen verwendet. Trotzdem aus der Gutscheinliste löschen?"))return;
+  state.fuelVouchers=(state.fuelVouchers||[]).filter(x=>x.id!==id);save();renderFuelHub()
+};
+
+function renderFuelHub(){
+  const c=car();
+  const prices=[...(state.fuelPrices||[])].sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(b.created||0)-(a.created||0));
+  const vouchers=[...(state.fuelVouchers||[])].sort((a,b)=>(Number(b.balance||0)-Number(a.balance||0)));
+
+  const priceList=$("fuelPriceList");
+  if(priceList){
+    priceList.innerHTML=prices.length?prices.map(x=>`
+      <div class="fuel-price-card">
+        <div>
+          <small>${esc(x.fuelType||"Kraftstoff")}</small>
+          <strong>${esc(x.station)}</strong>
+          <span>${[x.location,fmtDate(x.date)].filter(Boolean).map(esc).join(" · ")}</span>
+        </div>
+        <div class="fuel-price-value">
+          <b>${fuelPriceText(x.price)}</b>
+          <button class="mini danger" type="button" onclick="delFuelPrice('${x.id}')">Löschen</button>
+        </div>
+      </div>`).join(""):'<div class="empty">Noch keine Tankpreise gespeichert.</div>';
+  }
+
+  const voucherList=$("fuelVoucherList");
+  if(voucherList){
+    voucherList.innerHTML=vouchers.length?vouchers.map(x=>{
+      const initial=Number(x.initialBalance||x.balance||0),bal=Number(x.balance||0);
+      const pct=initial>0?Math.max(0,Math.min(100,Math.round(bal/initial*100))):0;
+      const expired=x.expiry && x.expiry<today();
+      return `<div class="fuel-voucher-card ${expired?"expired":""}">
+        <div class="fuel-voucher-top">
+          <div><small>${expired?"ABGELAUFEN":"TANKGUTSCHEIN"}</small><strong>${esc(x.provider||"Gutschein")}${x.name?` · ${esc(x.name)}`:""}</strong><span>${[x.expiry?`bis ${fmtDate(x.expiry)}`:"",x.code?`Code ${esc(x.code)}`:""].filter(Boolean).join(" · ")}</span></div>
+          <b>${money(bal)}</b>
+        </div>
+        <div class="fuel-voucher-progress"><i style="width:${pct}%"></i></div>
+        ${x.note?`<p>${esc(x.note)}</p>`:""}
+        <button class="mini danger" type="button" onclick="delFuelVoucher('${x.id}')">Löschen</button>
+      </div>`;
+    }).join(""):'<div class="empty">Noch keine Tankgutscheine gespeichert.</div>';
+  }
+
+  const lastFuel=[...(state.fuel||[])].filter(x=>!c||x.carId===c.id).sort((a,b)=>(b.date||"").localeCompare(a.date||""))[0];
+  if($("fuelHubLastPrice"))$("fuelHubLastPrice").textContent=lastFuel&&fuelUnitPrice(lastFuel.cost,lastFuel.liters)?fuelPriceText(fuelUnitPrice(lastFuel.cost,lastFuel.liters)):"–";
+  if($("fuelHubVoucherTotal"))$("fuelHubVoucherTotal").textContent=money(vouchers.reduce((s,x)=>s+Number(x.balance||0),0));
+
+  refreshFuelVoucherSelect();
+}
+
+
+// ---------------------------------------------------------
+// JIGGY 2.1.6 — TankPuls Livepreise
+// ---------------------------------------------------------
+let fuelLiveCoords=null;
+let fuelLiveStations=[];
+
+function fuelLiveSignalLabel(signal){
+  return {
+    low:"Günstig",
+    avg:"Durchschnitt",
+    high:"Teuer",
+    xhigh:"Sehr teuer"
+  }[signal]||"";
+}
+function fuelLiveSignalClass(signal){
+  return signal==="low"?"good":(signal==="high"||signal==="xhigh"?"bad":"warn");
+}
+function fuelLiveTypeKey(){
+  return String($("fuelLiveType")?.value||"Diesel").toLowerCase();
+}
+function fuelLivePrettyFuel(){
+  const x=$("fuelLiveType")?.value||"Diesel";
+  return x==="E5"?"Super E5":x==="E10"?"Super E10":"Diesel";
+}
+function fuelLiveTime(value){
+  if(!value)return "–";
+  try{
+    return new Date(value).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});
+  }catch{return "–"}
+}
+function renderFuelLiveResults(){
+  const box=$("fuelLiveResults");
+  if(!box)return;
+
+  if(!fuelLiveStations.length){
+    box.innerHTML='<div class="empty">Keine Tankstellen mit einem aktuellen Preis gefunden.</div>';
+    return;
+  }
+
+  const key=fuelLiveTypeKey();
+
+  box.innerHTML=fuelLiveStations.map((s,i)=>{
+    const price=Number(s?.prices?.[key]||0);
+    const signal=fuelLiveSignalLabel(s.signal);
+    const open=s.open===true;
+    const address=s.address||"";
+    return `<div class="fuel-live-station">
+      <div class="fuel-live-rank">${i+1}</div>
+      <div class="fuel-live-station-main">
+        <div class="fuel-live-station-title">
+          <strong>${esc(s.brand||"Tankstelle")}</strong>
+          <span class="status ${open?"good":"bad"}">${open?"GEÖFFNET":"GESCHLOSSEN"}</span>
+          ${signal?`<span class="status ${fuelLiveSignalClass(s.signal)}">${esc(signal)}</span>`:""}
+        </div>
+        <span>${esc(address)}</span>
+        <small>${Number(s.distance||0).toLocaleString("de-DE",{maximumFractionDigits:1})} km · gemeldet ${fuelLiveTime(s.reported_at)}</small>
+      </div>
+      <div class="fuel-live-price">
+        <strong>${price?fuelPriceText(price):"–"}</strong>
+        <button class="mini" type="button" onclick="useFuelLiveStation('${esc(s.id)}')">Tankung übernehmen</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+async function loadFuelLivePrices(){
+  if(!fuelLiveCoords){
+    return toast("Bitte zuerst deinen Standort verwenden","warn");
+  }
+
+  const stateBadge=$("fuelLiveState");
+  const refresh=$("fuelLiveRefresh");
+  if(stateBadge){stateBadge.textContent="LÄDT";stateBadge.className="status warn"}
+  if(refresh)refresh.disabled=true;
+
+  try{
+    const q=new URLSearchParams({
+      lat:String(fuelLiveCoords.lat),
+      lon:String(fuelLiveCoords.lon),
+      radius:String($("fuelLiveRadius")?.value||10),
+      fuel:String($("fuelLiveType")?.value||"Diesel"),
+      sort:String($("fuelLiveSort")?.value||"price")
+    });
+
+    const out=await authCloudRequest(`/api/fuel-prices?${q.toString()}`);
+    fuelLiveStations=Array.isArray(out.stations)?out.stations:[];
+
+    $("fuelLiveMedian").textContent=out.region?.median?fuelPriceText(out.region.median):"–";
+    $("fuelLiveCount").textContent=String(fuelLiveStations.length);
+    $("fuelLiveUpdated").textContent=fuelLiveTime(out.updatedAt);
+
+    if(stateBadge){stateBadge.textContent="LIVE";stateBadge.className="status good"}
+    renderFuelLiveResults();
+  }catch(e){
+    console.error("TankPuls load error:",e);
+    fuelLiveStations=[];
+    if(stateBadge){stateBadge.textContent="OFFLINE";stateBadge.className="status warn"}
+    try{
+      const fallback=await authCloudRequest("/api/fuel-prices/fallback");
+      const prices=fallback?.prices||{};
+      const cards=[
+        ["Diesel",prices.diesel],
+        ["Super E10",prices.e10],
+        ["Super E5",prices.e5]
+      ].filter(x=>Number(x[1])>0);
+
+      if(cards.length){
+        $("fuelLiveResults").innerHTML=`
+          <div class="fuel-fallback-box">
+            <div class="fuel-fallback-head">
+              <div>
+                <strong>Live-Tankstellen momentan nicht verfügbar</strong>
+                <span>Als Vergleich zeigt JIGGY den aktuellen Deutschland-Durchschnitt.</span>
+              </div>
+              <span class="status warn">FALLBACK</span>
+            </div>
+            <div class="fuel-fallback-prices">
+              ${cards.map(([name,price])=>`
+                <div>
+                  <span>${esc(name)}</span>
+                  <strong>${fuelPriceText(Number(price))}</strong>
+                </div>`).join("")}
+            </div>
+            <small>Quelle: ${esc(fallback.source||"Benzinpreis-Aktuell.de")}${fallback.updatedAt?` · Stand ${fuelLiveTime(fallback.updatedAt)}`:""}</small>
+          </div>`;
+        $("fuelLiveCount").textContent="–";
+        $("fuelLiveMedian").textContent=prices[fuelLiveTypeKey()]?fuelPriceText(Number(prices[fuelLiveTypeKey()])):"–";
+        return;
+      }
+    }catch(fallbackError){
+      console.error("Fuel fallback error:",fallbackError);
+    }
+
+    $("fuelLiveResults").innerHTML=`
+      <div class="fuel-live-error">
+        <strong>Tankpreise momentan nicht verfügbar</strong>
+        <span>Auch der Ersatzanbieter konnte gerade keine Preisdaten liefern. Deine Tankungen, Gutscheine und manuell gespeicherten Preise funktionieren weiterhin.</span>
+      </div>`;
+  }finally{
+    if(refresh)refresh.disabled=false;
+  }
+}
+
+
+async function setFuelLocationFromQuery(){
+  const input=$("fuelManualLocation");
+  const q=String(input?.value||"").trim();
+  if(!q)return toast("Bitte PLZ oder Ort eingeben","warn");
+
+  const btn=$("fuelUseManualLocation");
+  btn.disabled=true;
+  btn.textContent="Suche …";
+
+  try{
+    const out=await authCloudRequest(`/api/geocode?q=${encodeURIComponent(q)}`);
+    if(!out?.lat||!out?.lon)throw new Error("Ort wurde nicht gefunden");
+
+    fuelLiveCoords={
+      lat:Number(out.lat),
+      lon:Number(out.lon)
+    };
+
+    $("fuelLocationLabel").textContent=
+      `${out.label||q} · ${fuelLiveCoords.lat.toFixed(4)}, ${fuelLiveCoords.lon.toFixed(4)}`;
+
+    await loadFuelLivePrices();
+  }catch(e){
+    toast(e.message||"Ort konnte nicht gefunden werden","warn");
+  }finally{
+    btn.disabled=false;
+    btn.textContent="Suchen";
+  }
+}
+
+$("fuelUseManualLocation")?.addEventListener("click",setFuelLocationFromQuery);
+$("fuelManualLocation")?.addEventListener("keydown",e=>{
+  if(e.key==="Enter"){
+    e.preventDefault();
+    setFuelLocationFromQuery();
+  }
+});
+
+$("fuelUseLocation")?.addEventListener("click",()=>{
+  if(!navigator.geolocation){
+    return toast("Standortzugriff wird auf diesem Gerät nicht unterstützt","warn");
+  }
+
+  const btn=$("fuelUseLocation");
+  btn.disabled=true;
+  btn.textContent="Standort wird ermittelt …";
+
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      fuelLiveCoords={
+        lat:Number(pos.coords.latitude),
+        lon:Number(pos.coords.longitude)
+      };
+      $("fuelLocationLabel").textContent=
+        `${fuelLiveCoords.lat.toFixed(4)}, ${fuelLiveCoords.lon.toFixed(4)} · Genauigkeit ca. ${Math.round(pos.coords.accuracy||0)} m`;
+      btn.disabled=false;
+      btn.textContent="◎ Standort aktualisieren";
+      loadFuelLivePrices();
+    },
+    err=>{
+      btn.disabled=false;
+      btn.textContent="◎ Standort verwenden";
+      toast(err.code===1?"Standortzugriff wurde nicht erlaubt":"Standort konnte nicht ermittelt werden","warn");
+    },
+    {
+      enableHighAccuracy:true,
+      timeout:12000,
+      maximumAge:60000
+    }
+  );
+});
+
+$("fuelLiveRefresh")?.addEventListener("click",loadFuelLivePrices);
+["fuelLiveType","fuelLiveRadius","fuelLiveSort"].forEach(id=>{
+  $(id)?.addEventListener("change",()=>{
+    if(fuelLiveCoords)loadFuelLivePrices();
+  });
+});
+
+window.useFuelLiveStation=id=>{
+  const s=fuelLiveStations.find(x=>String(x.id)===String(id));
+  if(!s)return;
+
+  const key=fuelLiveTypeKey();
+  const price=Number(s?.prices?.[key]||0);
+
+  document.querySelector('[data-fuel-tab="entries"]')?.click();
+
+  if($("fuelStation"))$("fuelStation").value=s.brand||"";
+  if($("fuelType"))$("fuelType").value=fuelLivePrettyFuel();
+
+  // A live price is per liter. We keep the tank entry flexible:
+  // once liters are entered, JIGGY can pre-fill the calculated total.
+  if(price){
+    $("fuelLiters")?.focus();
+
+    const applyPrice=()=>{
+      const liters=Number($("fuelLiters")?.value||0);
+      if(liters>0){
+        $("fuelCost").value=(liters*price).toFixed(2);
+        updateFuelCalculatedPrice();
+      }
+    };
+
+    $("fuelLiters")?.addEventListener("change",applyPrice,{once:true});
+  }
+
+  toast(`${s.brand||"Tankstelle"} übernommen`);
+};
+
+
+document.querySelectorAll("[data-fuel-tab]").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    document.querySelectorAll("[data-fuel-tab]").forEach(x=>x.classList.toggle("active",x===btn));
+    document.querySelectorAll("[data-fuel-panel]").forEach(p=>p.classList.toggle("active",p.dataset.fuelPanel===btn.dataset.fuelTab));
+    renderFuelHub();
+  });
+});
+
 let editingBuildId=null;
 function resetBuildForm(){
   editingBuildId=null;
@@ -564,7 +1022,23 @@ function renderLists(){
 
   $("legalList").innerHTML=state.legal.filter(x=>c&&x.carId===c.id).map(x=>{if(x.type==="HU"){const cls=/^Bestanden/.test(x.result||x.status)?"good":"bad";return item("TÜV / HU",[x.date,x.km?`${num(x.km)} km`:"",x.nextDate?`Nächste HU: ${x.nextDate}`:"",x.number].filter(Boolean).join(" · "),`<span class="status ${cls}">${esc(x.result||x.status||"—")}</span>`,`<button class="mini" onclick="editLegal('${x.id}')">Bearbeiten</button><button class="mini danger" onclick="del('legal','${x.id}')">Löschen</button>`)}let cls=/Eingetragen|ABE|ECE|Serie/.test(x.status)?"good":/nötig|Unbekannt/.test(x.status)?"bad":"warn";return item(x.part,[x.number].filter(Boolean).join(" · "),`<span class="status ${cls}">${x.status}</span>`,`<button class="mini" onclick="editLegal('${x.id}')">Bearbeiten</button><button class="mini danger" onclick="del('legal','${x.id}')">Löschen</button>`)}).join("")||'<div class="empty">Noch keine TÜV/ABE-Einträge.</div>';
 
-  $("fuelList").innerHTML=state.fuel.filter(x=>c&&x.carId===c.id).sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(x=>item("Tankung",[x.date,`${num(x.km)} km`,`${x.liters||0} l`,money(x.cost),x.receiptFileName?`Beleg: ${esc(x.receiptFileName)}`:""].filter(Boolean).join(" · "),"",`${x.receiptFileId?`<button class="mini" onclick="openFuelReceipt('${x.id}')">Beleg</button>`:""}<button class="mini danger" onclick="del('fuel','${x.id}')">Löschen</button>`)).join("")||'<div class="empty">Noch keine Tankungen.</div>';
+  $("fuelList").innerHTML=state.fuel.filter(x=>c&&x.carId===c.id).sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(x=>{
+    const unit=fuelUnitPrice(x.cost,x.liters);
+    const details=[
+      x.date,
+      `${num(x.km)} km`,
+      x.fuelType||"",
+      x.station||"",
+      `${x.liters||0} l`,
+      money(x.cost),
+      unit?fuelPriceText(unit):"",
+      x.voucherAmount?`${money(x.voucherAmount)} Gutschein`:"",
+      x.receiptFileName?`Beleg: ${esc(x.receiptFileName)}`:""
+    ].filter(Boolean).join(" · ");
+    return item("Tankung",details,"",`${x.receiptFileId?`<button class="mini" onclick="openFuelReceipt('${x.id}')">Beleg</button>`:""}<button class="mini danger" onclick="del('fuel','${x.id}')">Löschen</button>`);
+  }).join("")||'<div class="empty">Noch keine Tankungen.</div>';
+
+  renderFuelHub();
 
   $("buildList").innerHTML=state.builds.filter(x=>c&&x.carId===c.id).map(x=>{const saved=Math.min(+x.saved||0,+x.price||0),pct=x.price?Math.round(saved/(+x.price||1)*100):0;const savings=x.status!=="Verbaut"?` · ${money(saved)} gespart (${pct}%)`:"";return item(x.name,[x.category,money(x.price)].join(" · ")+savings,`<span class="status ${x.status==="Verbaut"?"good":""}">${x.status}</span>`,`<button class="mini" onclick="editBuild('${x.id}')">Bearbeiten</button><button class="mini danger" onclick="del('builds','${x.id}')">Löschen</button>`)}).join("")||'<div class="empty">Noch keine Umbauten.</div>';
 }
@@ -1057,7 +1531,7 @@ async function syncCloudGarage({silent=false}={}){
       }
       const m=meta[localId]||{},remoteFp=bundleFingerprint(row.data||{}),localChanged=!!m.fingerprint&&localFp!==m.fingerprint,remoteChanged=!!m.cloudUpdatedAt&&row.updatedAt!==m.cloudUpdatedAt;
       if(!m.fingerprint){
-        // First sync after Beta 2 import: matching content establishes baseline; otherwise prefer local once.
+        // First sync after  2 import: matching content establishes baseline; otherwise prefer local once.
         if(localFp===remoteFp){meta[localId]={fingerprint:localFp,cloudUpdatedAt:row.updatedAt};continue}
         await authCloudRequest(`/api/garage/vehicles/${encodeURIComponent(cloudId)}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({...localBundle,syncedAt:new Date().toISOString()})});pushed++;
         meta[localId]={fingerprint:localFp,cloudUpdatedAt:new Date().toISOString()};continue;
@@ -1136,6 +1610,1128 @@ function renderPublicProfile(){
 ["profileName","profileBio","profileTheme","profileSpecs","profileMileage","profilePlate","profileMods","profileGallery"].forEach(id=>$(id)?.addEventListener(id.includes("Name")||id.includes("Bio")?"input":"change",()=>{saveProfileConfig(localProfileSettings());renderPublicProfile()}));
 $("profileCar")?.addEventListener("change",renderPublicProfile);
 async function cloudRequest(path,options={}){const r=await fetch(JIGGY_CLOUD.apiUrl+path,options);const text=await r.text();let data={};try{data=text?JSON.parse(text):{}}catch{}if(!r.ok)throw new Error(data.error||text.slice(0,180)||`HTTP ${r.status}`);return data}
+
+
+/* JIGGY Spots V2 */
+let spotsMap=null,spotsMarkers=[],spotsCache=[],spotsTypeFilter="";
+let pendingSpotCoords=null,spotDraftMarker=null,spotPickMode=false;
+let activeSpotDetail=null,activeSpotMedia=[],activeSpotMediaIndex=0,spotObjectUrls=[];
+let activeMeetAttendance={count:0,joined:false};
+
+function spotEsc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
+function spotStyle(){
+  return {
+    version:8,
+    sources:{osm:{type:"raster",tiles:["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],tileSize:256,attribution:"© OpenStreetMap contributors"}},
+    layers:[{id:"osm",type:"raster",source:"osm"}]
+  };
+}
+function spotTypeLabel(s){return s?.spotType==="meet"?"Treffen":"Fotospot"}
+function spotTypeIcon(s){return s?.spotType==="meet"?"🚗":"📸"}
+function spotDateLabel(s){
+  if(s?.spotType!=="meet"||!s.eventStart)return "";
+  try{
+    const d=new Date(s.eventStart);
+    return new Intl.DateTimeFormat("de-DE",{dateStyle:"medium",timeStyle:"short"}).format(d);
+  }catch{return ""}
+}
+// JIGGY Jobs V1
+// -----------------------------------------------------------------------------
+let jobsCache=[];
+let jobsSummaryCache={};
+let activeJobId=null;
+let activeJobSnapshot=null;
+let jobsInitialized=false;
+let editingJobId=null;
+
+function jobsMoney(v){return Number(v||0).toLocaleString("de-DE",{style:"currency",currency:"EUR"})}
+function jobsTime(minutes){
+  const m=Math.max(0,Number(minutes||0)),h=Math.floor(m/60),rest=Math.round(m%60);
+  return `${h}:${String(rest).padStart(2,"0")} h`;
+}
+function jobsStatusLabel(s){
+  return ({draft:"Entwurf",open:"Offen",in_progress:"In Arbeit",completed:"Fertig",invoiced:"Abgerechnet",paid:"Bezahlt",cancelled:"Storniert"})[s]||s||"–";
+}
+function jobsPaymentMethodLabel(s){
+  return ({cash:"Bar",bank_transfer:"Überweisung",paypal:"PayPal",card:"Karte",other:"Sonstiges"})[s]||"";
+}
+function jobsEsc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function jobsModal(id,on){
+  const m=$(id);if(!m)return;m.classList.toggle("open",!!on);m.setAttribute("aria-hidden",on?"false":"true");
+}
+function jobsRequireAccount(){
+  if(accountSession().token)return true;
+  $("jobsList").innerHTML='<div class="log-empty">Bitte unter „Mehr“ zuerst mit deinem JIGGY Account anmelden.</div>';
+  $("jobDetail") && ($("jobDetail").hidden=true);
+  $("jobDetailEmpty") && ($("jobDetailEmpty").hidden=false);
+  return false;
+}
+async function initJobsView(){
+  if(!jobsRequireAccount())return;
+  if(!$("jobWorkDate").value)$("jobWorkDate").value=new Date().toISOString().slice(0,10);
+  await loadJobs();
+  jobsInitialized=true;
+}
+async function loadJobs(){
+  if(!jobsRequireAccount())return;
+  $("jobsList").innerHTML='<div class="log-empty">Jobs werden geladen …</div>';
+  try{
+    const out=await authCloudRequest("/api/jobs");
+    jobsCache=out.jobs||[];
+    jobsSummaryCache=out.summary||{};
+    renderJobs();
+    if(activeJobId && jobsCache.some(x=>x.id===activeJobId))await openJob(activeJobId);
+  }catch(e){
+    $("jobsList").innerHTML=`<div class="log-empty">Jobs konnten nicht geladen werden: ${jobsEsc(e.message)}</div>`;
+  }
+}
+function filteredJobs(){
+  const search=($("jobsSearch")?.value||"").trim().toLowerCase(),status=$("jobsStatusFilter")?.value||"";
+  return jobsCache.filter(j=>{
+    if(status&&j.status!==status)return false;
+    if(!search)return true;
+    const hay=[j.title,j.description,j.customer?.name,j.customer?.email,j.vehicle?.make,j.vehicle?.model,j.vehicle?.plate].filter(Boolean).join(" ").toLowerCase();
+    return hay.includes(search);
+  });
+}
+function renderJobs(){
+  const list=filteredJobs();
+  $("jobsCount").textContent=`${list.length} Jobs`;
+  const summary=jobsSummaryCache||{};
+  $("jobsIncomeTotal").textContent=jobsMoney(summary.income||0);
+  $("jobsProfitTotal").textContent=jobsMoney(summary.profit||0);
+  $("jobsTipsTotal").textContent=jobsMoney(summary.tips||0);
+  $("jobsOpenAmount").textContent=jobsMoney(summary.openAmount||0);
+  $("jobsOpenCount").textContent=`${Number(summary.openJobs||0)} offene Jobs`;
+  $("jobsPaidCount").textContent=`${Number(summary.paidJobs||0)} bezahlte Jobs`;
+  if(!list.length){$("jobsList").innerHTML='<div class="log-empty">Noch keine passenden Jobs.</div>';return}
+  $("jobsList").innerHTML=list.map(j=>{
+    const vehicle=[j.vehicle?.make,j.vehicle?.model].filter(Boolean).join(" ")||"Fahrzeug nicht angegeben";
+    return `<button class="job-row ${j.id===activeJobId?"active":""}" data-job-id="${jobsEsc(j.id)}" type="button">
+      <div class="job-row-top"><strong>${jobsEsc(j.title)}</strong><span class="job-status ${jobsEsc(j.status)}">${jobsEsc(jobsStatusLabel(j.status))}</span></div>
+      <span>${jobsEsc(j.customer?.name||"Ohne Kundenname")} · ${jobsEsc(vehicle)}</span>
+      <small>${jobsEsc(j.vehicle?.plate||"Kein Kennzeichen")} · ${jobsMoney(j.totals?.total||0)}</small>
+    </button>`;
+  }).join("");
+}
+async function openJob(id){
+  if(!id)return;activeJobId=id;renderJobs();
+  $("jobDetailEmpty").hidden=true;$("jobDetail").hidden=false;
+  $("jobDetailTitle").textContent="Lädt …";
+  try{
+    const out=await authCloudRequest(`/api/jobs/${encodeURIComponent(id)}`);
+    const j=out.job||{},work=out.work||[],materials=out.materials||[],tot=out.totals||{};
+    $("jobDetailTitle").textContent=j.title||"Auftrag";
+    $("jobDetailStatus").textContent=jobsStatusLabel(j.status);$("jobDetailStatus").className=`job-status ${j.status||""}`;
+    $("jobDetailMeta").textContent=[j.createdAt?new Date(j.createdAt).toLocaleDateString("de-DE"):"",j.description||""].filter(Boolean).join(" · ");
+    $("jobCustomerName").textContent=j.customer?.name||"–";
+    $("jobCustomerContact").textContent=[j.customer?.email,j.customer?.phone,j.customer?.address].filter(Boolean).join(" · ")||"Keine Kontaktdaten";
+    $("jobVehicleName").textContent=[j.vehicle?.make,j.vehicle?.model].filter(Boolean).join(" ")||"–";
+    $("jobVehicleInfo").textContent=[j.vehicle?.plate,j.vehicle?.vin].filter(Boolean).join(" · ")||"Keine weiteren Fahrzeugdaten";
+    $("jobTotalTime").textContent=jobsTime(tot.minutes);$("jobLabor").textContent=jobsMoney(tot.labor);$("jobMaterials").textContent=jobsMoney(tot.materials);$("jobTotal").textContent=jobsMoney(tot.total);
+    $("jobOrderValue").textContent=jobsMoney(tot.total);
+    $("jobPaidAmount").textContent=j.payment?.paidAmount==null?"–":jobsMoney(j.payment.paidAmount);
+    $("jobTipAmount").textContent=jobsMoney(tot.tip||0);
+    $("jobIncome").textContent=jobsMoney(tot.income||0);
+    $("jobPurchaseCost").textContent=jobsMoney(tot.purchaseCost||0);
+    $("jobProfit").textContent=jobsMoney(tot.profit||0);
+    $("jobPaymentState").textContent=j.payment?.paid?"Bezahlt":"Noch offen";
+    $("jobPaymentCard").classList.toggle("paid",!!j.payment?.paid);
+    $("jobMarkPaid").textContent=j.payment?.paid?"Zahlung bearbeiten":"✓ Als bezahlt markieren";
+    $("jobPaymentMeta").textContent=j.payment?.paid?[jobsPaymentMethodLabel(j.payment.paymentMethod),j.payment.paidAt?new Date(j.payment.paidAt).toLocaleString("de-DE"):""].filter(Boolean).join(" · "):"";
+    activeJobSnapshot={job:j,totals:tot,invoice:out.invoice||null};
+    const createInvoiceBtn=$("jobCreateInvoice"),openInvoiceBtn=$("jobOpenInvoice");
+    if(out.invoice){createInvoiceBtn.hidden=true;openInvoiceBtn.hidden=false;openInvoiceBtn.textContent=`↗ Rechnung ${out.invoice.invoiceNumber||""} öffnen`;}
+    else{createInvoiceBtn.hidden=false;openInvoiceBtn.hidden=true;createInvoiceBtn.disabled=false;createInvoiceBtn.textContent="🧾 Rechnung erstellen";}
+    $("jobWorkCount").textContent=`${work.length} Einträge`;$("jobMaterialCount").textContent=`${materials.length} Positionen`;
+    $("jobWorkList").innerHTML=work.length?work.map(w=>`<div class="job-line"><div><strong>${jobsEsc(w.description)}</strong><span>${jobsTime(w.minutes)} · ${jobsMoney(w.hourlyRate)}/h · ${w.workDate?new Date(w.workDate).toLocaleDateString("de-DE"):""}</span></div><b>${w.billable?jobsMoney(w.amount):"nicht berechnet"}</b></div>`).join(""):'<div class="log-empty compact">Noch keine Arbeitszeit.</div>';
+    $("jobMaterialList").innerHTML=materials.length?materials.map(m=>`<div class="job-line"><div><strong>${jobsEsc(m.description)}</strong><span>${Number(m.quantity).toLocaleString("de-DE")} × ${jobsMoney(m.unitPrice)}${m.partNumber?` · ${jobsEsc(m.partNumber)}`:""}</span></div><b>${m.billable?jobsMoney(m.amount):"nicht berechnet"}</b></div>`).join(""):'<div class="log-empty compact">Noch kein Material.</div>';
+  }catch(e){
+    $("jobDetailTitle").textContent="Fehler";
+    $("jobDetailMeta").textContent=e.message;
+  }
+}
+$("jobsList")?.addEventListener("click",e=>{const row=e.target.closest("[data-job-id]");if(row)openJob(row.dataset.jobId)});
+$("jobsSearch")?.addEventListener("input",renderJobs);
+$("jobsStatusFilter")?.addEventListener("change",renderJobs);
+$("jobsRefresh")?.addEventListener("click",loadJobs);
+
+
+function openJobEditor(job=null){
+  if(!accountSession().token){
+    toast("Bitte zuerst mit deinem JIGGY Account anmelden","warn");
+    show("more");
+    return;
+  }
+
+  $("jobCreateForm").reset();
+  $("jobCreateMessage").textContent="";
+  editingJobId=job?.id||null;
+
+  if($("jobEditorTitle"))$("jobEditorTitle").textContent=editingJobId?"Auftrag bearbeiten":"Neuer Auftrag";
+  if($("jobEditorSubtitle"))$("jobEditorSubtitle").textContent=editingJobId
+    ?"Kunde, Fahrzeug und Auftragsdaten anpassen."
+    :"Kunde und Fahrzeug können komplett frei eingetragen werden.";
+  if($("jobCreateSubmit"))$("jobCreateSubmit").textContent=editingJobId?"Änderungen speichern":"Auftrag erstellen";
+
+  if(job){
+    $("jobCustomerInput").value=job.customer?.name||"";
+    $("jobCustomerEmail").value=job.customer?.email||"";
+    $("jobCustomerPhone").value=job.customer?.phone||"";
+    $("jobCustomerAddress").value=job.customer?.address||"";
+
+    $("jobVehicleMake").value=job.vehicle?.make||"";
+    $("jobVehicleModel").value=job.vehicle?.model||"";
+    $("jobVehiclePlate").value=job.vehicle?.plate||"";
+    $("jobVehicleVin").value=job.vehicle?.vin||"";
+
+    $("jobTitleInput").value=job.title||"";
+    $("jobDescriptionInput").value=job.description||"";
+    $("jobNotesInput").value=job.notes||"";
+  }
+
+  jobsModal("jobCreateModal",true);
+}
+
+$("jobCreateOpen")?.addEventListener("click",()=>openJobEditor());
+$("jobEditOpen")?.addEventListener("click",()=>{
+  if(!activeJobSnapshot?.job)return;
+  openJobEditor(activeJobSnapshot.job);
+});
+$("jobDeleteBtn")?.addEventListener("click",async()=>{
+  const job=activeJobSnapshot?.job;
+  if(!job?.id)return;
+
+  const label=job.title||"Auftrag";
+  if(!confirm(`„${label}“ wirklich löschen?\n\nArbeitszeiten, Material, Zahlungen und zugehörige Rechnungsdaten dieses Auftrags werden ebenfalls entfernt.`))return;
+
+  const btn=$("jobDeleteBtn");
+  btn.disabled=true;
+  btn.textContent="Lösche …";
+
+  try{
+    await authCloudRequest(
+      `/api/jobs/${encodeURIComponent(job.id)}`,
+      {method:"DELETE"}
+    );
+
+    activeJobId=null;
+    activeJobSnapshot=null;
+    $("jobDetailEmpty").hidden=false;
+    $("jobDetail").hidden=true;
+
+    await loadJobs();
+    toast("Auftrag gelöscht","warn");
+  }catch(e){
+    toast(e.message||"Auftrag konnte nicht gelöscht werden","warn");
+  }finally{
+    btn.disabled=false;
+    btn.textContent="🗑 Auftrag löschen";
+  }
+});
+["jobCreateClose","jobCreateCancel"].forEach(id=>$(id)?.addEventListener("click",()=>{editingJobId=null;jobsModal("jobCreateModal",false)}));
+$("jobCreateModal")?.addEventListener("click",e=>{if(e.target===$("jobCreateModal"))jobsModal("jobCreateModal",false)});
+$("jobCreateForm")?.addEventListener("submit",async e=>{
+  e.preventDefault();
+
+  const btn=$("jobCreateSubmit");
+  btn.disabled=true;
+  btn.textContent=editingJobId?"Speichere …":"Erstelle …";
+  $("jobCreateMessage").textContent="";
+
+  try{
+    const body={
+      title:$("jobTitleInput").value.trim(),
+      description:$("jobDescriptionInput").value.trim()||null,
+
+      customerName:$("jobCustomerInput").value.trim(),
+      customerEmail:$("jobCustomerEmail").value.trim()||null,
+      customerPhone:$("jobCustomerPhone").value.trim()||null,
+      customerAddress:$("jobCustomerAddress").value.trim()||null,
+
+      vehicleMake:$("jobVehicleMake").value.trim(),
+      vehicleModel:$("jobVehicleModel").value.trim(),
+      vehiclePlate:$("jobVehiclePlate").value.trim()||null,
+      vehicleVin:$("jobVehicleVin").value.trim()||null,
+
+      notes:$("jobNotesInput").value.trim()||null
+    };
+
+    let out;
+
+    if(editingJobId){
+      out=await authCloudRequest(
+        `/api/jobs/${encodeURIComponent(editingJobId)}`,
+        {
+          method:"PUT",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify(body)
+        }
+      );
+
+      activeJobId=editingJobId;
+      toast("Auftrag aktualisiert");
+    }else{
+      out=await authCloudRequest(
+        "/api/jobs",
+        {
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify(body)
+        }
+      );
+
+      activeJobId=out.job?.id||null;
+      toast("Auftrag erstellt");
+    }
+
+    jobsModal("jobCreateModal",false);
+    editingJobId=null;
+    await loadJobs();
+
+    if(activeJobId){
+      await openJob(activeJobId);
+    }
+  }catch(err){
+    $("jobCreateMessage").textContent=err.message;
+    $("jobCreateMessage").className="cloud-message bad";
+  }finally{
+    btn.disabled=false;
+    btn.textContent=editingJobId?"Änderungen speichern":"Auftrag erstellen";
+  }
+});
+
+$("jobAddWork")?.addEventListener("click",()=>{if(!activeJobId)return;$("jobWorkForm").reset();$("jobWorkHours").value="0";$("jobWorkMinutes").value="30";$("jobWorkRate").value="40";$("jobWorkDate").value=new Date().toISOString().slice(0,10);$("jobWorkBillable").checked=true;$("jobWorkMessage").textContent="";jobsModal("jobWorkModal",true)});
+["jobWorkClose","jobWorkCancel"].forEach(id=>$(id)?.addEventListener("click",()=>jobsModal("jobWorkModal",false)));
+$("jobWorkModal")?.addEventListener("click",e=>{if(e.target===$("jobWorkModal"))jobsModal("jobWorkModal",false)});
+$("jobWorkForm")?.addEventListener("submit",async e=>{
+  e.preventDefault();if(!activeJobId)return;
+  const minutes=(Number($("jobWorkHours").value)||0)*60+(Number($("jobWorkMinutes").value)||0);
+  $("jobWorkMessage").textContent="";
+  try{
+    await authCloudRequest(`/api/jobs/${encodeURIComponent(activeJobId)}/work`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({description:$("jobWorkDescription").value.trim(),minutes,hourlyRate:Number($("jobWorkRate").value)||0,workDate:$("jobWorkDate").value||null,billable:$("jobWorkBillable").checked})});
+    jobsModal("jobWorkModal",false);toast("Arbeitszeit gespeichert");await loadJobs();await openJob(activeJobId);
+  }catch(err){$("jobWorkMessage").textContent=err.message;$("jobWorkMessage").className="cloud-message bad"}
+});
+
+$("jobAddMaterial")?.addEventListener("click",()=>{if(!activeJobId)return;$("jobMaterialForm").reset();$("jobMaterialQty").value="1";$("jobMaterialPrice").value="0";$("jobMaterialBillable").checked=true;$("jobMaterialMessage").textContent="";jobsModal("jobMaterialModal",true)});
+["jobMaterialClose","jobMaterialCancel"].forEach(id=>$(id)?.addEventListener("click",()=>jobsModal("jobMaterialModal",false)));
+$("jobMaterialModal")?.addEventListener("click",e=>{if(e.target===$("jobMaterialModal"))jobsModal("jobMaterialModal",false)});
+$("jobMaterialForm")?.addEventListener("submit",async e=>{
+  e.preventDefault();if(!activeJobId)return;$("jobMaterialMessage").textContent="";
+  try{
+    await authCloudRequest(`/api/jobs/${encodeURIComponent(activeJobId)}/materials`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({description:$("jobMaterialDescription").value.trim(),partNumber:$("jobMaterialPart").value.trim()||null,quantity:Number($("jobMaterialQty").value)||1,purchasePrice:$("jobMaterialPurchase").value===""?null:Number($("jobMaterialPurchase").value),unitPrice:Number($("jobMaterialPrice").value)||0,billable:$("jobMaterialBillable").checked,notes:$("jobMaterialNotes").value.trim()||null})});
+    jobsModal("jobMaterialModal",false);toast("Material gespeichert");await loadJobs();await openJob(activeJobId);
+  }catch(err){$("jobMaterialMessage").textContent=err.message;$("jobMaterialMessage").className="cloud-message bad"}
+});
+
+
+function updateJobPaymentPreview(){
+  const paid=Number($("jobPaymentPaid")?.value||0),tip=Number($("jobPaymentTip")?.value||0);
+  const income=paid+tip,purchase=Number(activeJobSnapshot?.totals?.purchaseCost||0);
+  $("jobPaymentIncomePreview").textContent=jobsMoney(income);
+  $("jobPaymentProfitPreview").textContent=jobsMoney(income-purchase);
+}
+$("jobMarkPaid")?.addEventListener("click",()=>{
+  if(!activeJobId||!activeJobSnapshot)return;
+  const p=activeJobSnapshot.job?.payment||{},total=Number(activeJobSnapshot.totals?.total||0);
+  $("jobPaymentPaid").value=p.paidAmount==null?total.toFixed(2):Number(p.paidAmount).toFixed(2);
+  $("jobPaymentTip").value=Number(p.tipAmount||0).toFixed(2);
+  $("jobPaymentMethod").value=p.paymentMethod||"cash";
+  $("jobPaymentOrderValue").textContent=jobsMoney(total);
+  $("jobPaymentMessage").textContent="";
+  updateJobPaymentPreview();
+  jobsModal("jobPaymentModal",true);
+});
+["jobPaymentClose","jobPaymentCancel"].forEach(id=>$(id)?.addEventListener("click",()=>jobsModal("jobPaymentModal",false)));
+$("jobPaymentModal")?.addEventListener("click",e=>{if(e.target===$("jobPaymentModal"))jobsModal("jobPaymentModal",false)});
+$("jobPaymentPaid")?.addEventListener("input",updateJobPaymentPreview);
+$("jobPaymentTip")?.addEventListener("input",updateJobPaymentPreview);
+$("jobPaymentForm")?.addEventListener("submit",async e=>{
+  e.preventDefault();if(!activeJobId)return;
+  const btn=$("jobPaymentSubmit");btn.disabled=true;btn.textContent="Speichere …";$("jobPaymentMessage").textContent="";
+  try{
+    await authCloudRequest(`/api/jobs/${encodeURIComponent(activeJobId)}/payment`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({paidAmount:Number($("jobPaymentPaid").value)||0,tipAmount:Number($("jobPaymentTip").value)||0,paymentMethod:$("jobPaymentMethod").value})});
+    jobsModal("jobPaymentModal",false);toast("Zahlung gespeichert");await loadJobs();await openJob(activeJobId);
+  }catch(err){$("jobPaymentMessage").textContent=err.message;$("jobPaymentMessage").className="cloud-message bad"}
+  finally{btn.disabled=false;btn.textContent="Zahlung speichern"}
+});
+
+
+let invoiceSettingsCache=null;
+function fillInvoiceSettingsForm(s={}){
+  const set=(id,v)=>{if($(id))$(id).value=v??""};
+  set("invoiceBusinessName",s.businessName);set("invoiceOwnerName",s.ownerName);set("invoiceStreet",s.street);set("invoicePostalCode",s.postalCode);set("invoiceCity",s.city);set("invoiceCountry",s.country||"Deutschland");set("invoiceEmail",s.email);set("invoicePhone",s.phone);set("invoiceIban",s.iban);set("invoiceBic",s.bic);set("invoiceBankName",s.bankName);set("invoicePrefix",s.invoicePrefix||"JIG");
+}
+function renderInvoiceSettingsSummary(){
+  const el=$("invoiceSettingsSummary");if(!el)return;
+  if(!accountSession().token){el.innerHTML='<span class="muted">Bitte zuerst anmelden.</span>';return}
+  const s=invoiceSettingsCache;if(!s){el.innerHTML='<span class="muted">Noch keine Rechnungseinstellungen gespeichert.</span>';return}
+  const name=s.businessName||s.ownerName||"Ohne Absendername",place=[s.postalCode,s.city].filter(Boolean).join(" ");
+  el.innerHTML=`<div><strong>${jobsEsc(name)}</strong><span>${jobsEsc([s.street,place].filter(Boolean).join(" · ")||"Adresse noch unvollständig")}</span></div><div><strong>Rechnungsserie</strong><span>${jobsEsc(s.invoicePrefix||"JIG")}</span></div>`;
+}
+async function loadInvoiceSettings(){
+  if(!accountSession().token){invoiceSettingsCache=null;renderInvoiceSettingsSummary();return null}
+  try{const out=await authCloudRequest("/api/invoice-settings");invoiceSettingsCache=out.settings||null;renderInvoiceSettingsSummary();return invoiceSettingsCache}
+  catch(e){const el=$("invoiceSettingsSummary");if(el)el.textContent=`Rechnungsdaten konnten nicht geladen werden: ${e.message}`;return null}
+}
+$("invoiceSettingsOpen")?.addEventListener("click",async()=>{if(!accountSession().token){toast("Bitte zuerst anmelden","warn");return}const s=await loadInvoiceSettings();fillInvoiceSettingsForm(s||{});$("invoiceSettingsMessage").textContent="";jobsModal("invoiceSettingsModal",true)});
+["invoiceSettingsClose","invoiceSettingsCancel"].forEach(id=>$(id)?.addEventListener("click",()=>jobsModal("invoiceSettingsModal",false)));
+$("invoiceSettingsModal")?.addEventListener("click",e=>{if(e.target===$("invoiceSettingsModal"))jobsModal("invoiceSettingsModal",false)});
+$("invoiceSettingsForm")?.addEventListener("submit",async e=>{
+ e.preventDefault();const btn=$("invoiceSettingsSubmit");btn.disabled=true;btn.textContent="Speichere …";$("invoiceSettingsMessage").textContent="";
+ try{
+  const body={businessName:$("invoiceBusinessName").value.trim()||null,ownerName:$("invoiceOwnerName").value.trim()||null,street:$("invoiceStreet").value.trim()||null,postalCode:$("invoicePostalCode").value.trim()||null,city:$("invoiceCity").value.trim()||null,country:$("invoiceCountry").value.trim()||"Deutschland",email:$("invoiceEmail").value.trim()||null,phone:$("invoicePhone").value.trim()||null,iban:$("invoiceIban").value.trim()||null,bic:$("invoiceBic").value.trim()||null,bankName:$("invoiceBankName").value.trim()||null,taxNumber:null,vatId:null,defaultTaxRate:0,defaultPaymentDays:0,invoicePrefix:$("invoicePrefix").value.trim()||"JIG"};
+  await authCloudRequest("/api/invoice-settings",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});invoiceSettingsCache=body;renderInvoiceSettingsSummary();jobsModal("invoiceSettingsModal",false);toast("Rechnungseinstellungen gespeichert");
+ }catch(err){$("invoiceSettingsMessage").textContent=err.message;$("invoiceSettingsMessage").className="cloud-message bad"}
+ finally{btn.disabled=false;btn.textContent="Speichern"}
+});
+$("jobCreateInvoice")?.addEventListener("click",async()=>{
+ if(!activeJobId)return;if(!confirm("Rechnung für diesen Auftrag erstellen?"))return;
+ const btn=$("jobCreateInvoice");btn.disabled=true;btn.textContent="Rechnung wird erstellt …";
+ try{const out=await authCloudRequest(`/api/jobs/${encodeURIComponent(activeJobId)}/invoice`,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});toast(`Rechnung ${out.invoice?.invoiceNumber||""} erstellt`);await loadJobs();await openJob(activeJobId)}
+ catch(err){toast(err.message,"warn");btn.disabled=false;btn.textContent="🧾 Rechnung erstellen"}
+});
+async function openInvoicePdf(invoiceId){
+ const session=accountSession();if(!session.token)throw new Error("Bitte zuerst anmelden");
+ const r=await fetch(`${JIGGY_CLOUD.apiUrl}/api/invoices/${encodeURIComponent(invoiceId)}/pdf`,{headers:{Authorization:`Bearer ${session.token}`}});
+ if(!r.ok){let msg=`PDF konnte nicht geladen werden (${r.status})`;try{const d=await r.json();if(d?.error)msg=d.error}catch{}throw new Error(msg)}
+ const blob=await r.blob(),url=URL.createObjectURL(blob),win=window.open(url,"_blank");
+ if(!win){const a=document.createElement("a");a.href=url;a.download=`${activeJobSnapshot?.invoice?.invoiceNumber||"rechnung"}.pdf`;document.body.appendChild(a);a.click();a.remove()}
+ setTimeout(()=>URL.revokeObjectURL(url),60000);
+}
+$("jobOpenInvoice")?.addEventListener("click",async()=>{const inv=activeJobSnapshot?.invoice;if(!inv?.id)return;try{await openInvoicePdf(inv.id)}catch(err){toast(err.message,"warn")}});
+
+
+// BETA 4.1: Eingabefix für Rechnungseinstellungen.
+// Verhindert, dass globale Drag/Pointer-Handler der App Eingaben im Modal abfangen.
+(function initInvoiceSettingsInputFix(){
+  const modal=document.getElementById("invoiceSettingsModal");
+  if(!modal)return;
+  const stop=e=>e.stopPropagation();
+  ["pointerdown","mousedown","touchstart","dragstart"].forEach(type=>{
+    modal.addEventListener(type,stop,true);
+  });
+  modal.querySelectorAll("input, textarea, select").forEach(el=>{
+    el.disabled=false;
+    el.readOnly=false;
+    el.style.pointerEvents="auto";
+    el.addEventListener("click",e=>e.stopPropagation());
+  });
+})();
+
+
+
+// ---------------------------------------------------------
+// JIGGY Public Profile – schöne Profil-URL /u/name
+// ---------------------------------------------------------
+function normalizeProfileSlug(v){
+  return String(v||"").trim().toLowerCase();
+}
+
+let profileSlugCheckTimer=null;
+
+async function loadProfileSlug(){
+  const input=$("profileSlug");
+  const status=$("profileSlugStatus");
+  if(!input||!status||!accountSession().token)return;
+
+  try{
+    const out=await authCloudRequest("/api/profiles/me/slug");
+    input.value=out.slug||"";
+    status.textContent=out.slug
+      ? `Dein Profil: jiggy-cloud.org/u/${out.slug}`
+      : "Noch kein eigener Profil-Link vergeben.";
+    status.className="profile-slug-status good";
+  }catch(e){
+    if(e?.message?.includes("noch kein öffentliches Profil")){
+      status.textContent="Veröffentliche dein Profil zuerst, danach kannst du den Link festlegen.";
+      status.className="profile-slug-status";
+      return;
+    }
+    status.textContent=e.message||"Profil-Link konnte nicht geladen werden.";
+    status.className="profile-slug-status bad";
+  }
+}
+
+$("profileSlug")?.addEventListener("input",()=>{
+  const input=$("profileSlug");
+  const status=$("profileSlugStatus");
+  const slug=normalizeProfileSlug(input.value);
+  input.value=slug;
+
+  clearTimeout(profileSlugCheckTimer);
+
+  if(slug.length<3){
+    status.textContent="3–30 Zeichen · a–z, 0–9, - und _";
+    status.className="profile-slug-status";
+    return;
+  }
+
+  profileSlugCheckTimer=setTimeout(async()=>{
+    try{
+      const out=await authCloudRequest(`/api/profiles/slug-check/${encodeURIComponent(slug)}`);
+      status.textContent=out.available
+        ? (out.ownedByYou?"Dieser Link gehört bereits dir.":"Profil-Link ist verfügbar.")
+        : "Dieser Profil-Link ist bereits vergeben.";
+      status.className=`profile-slug-status ${out.available?"good":"bad"}`;
+    }catch(e){
+      status.textContent=e.message||"Profil-Link konnte nicht geprüft werden.";
+      status.className="profile-slug-status bad";
+    }
+  },350);
+});
+
+$("profileSlug")?.addEventListener("change",async()=>{
+  const input=$("profileSlug");
+  const status=$("profileSlugStatus");
+  const slug=normalizeProfileSlug(input.value);
+  if(slug.length<3)return;
+
+  try{
+    const out=await authCloudRequest(
+      "/api/profiles/me/slug",
+      {
+        method:"PUT",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({slug})
+      }
+    );
+
+    status.textContent=`Gespeichert: ${out.url}`;
+    status.className="profile-slug-status good";
+    toast("Profil-Link gespeichert");
+  }catch(e){
+    status.textContent=e.message||"Profil-Link konnte nicht gespeichert werden.";
+    status.className="profile-slug-status bad";
+  }
+});
+
+function initSpotsView(){
+  if(!window.maplibregl){$("spotsList").innerHTML='<div class="log-empty">Karte konnte nicht geladen werden.</div>';return}
+  if(!spotsMap){
+    spotsMap=new maplibregl.Map({container:"spotsMap",style:spotStyle(),center:[6.62,51.66],zoom:9});
+    spotsMap.addControl(new maplibregl.NavigationControl(),"top-right");
+    spotsMap.on("click",e=>{
+      if(!spotPickMode)return;
+      setSpotCoords(e.lngLat.lat,e.lngLat.lng,true);
+      stopSpotPickMode();
+      openSpotCreateModal(true);
+    });
+  }else setTimeout(()=>spotsMap.resize(),30);
+  loadSpots();
+}
+async function loadSpots(){
+  const list=$("spotsList");if(!list)return;
+  list.innerHTML='<div class="log-empty">Spots werden geladen …</div>';
+  try{
+    const out=await cloudRequest("/api/spots");
+    spotsCache=Array.isArray(out.spots)?out.spots:[];
+    renderSpots();
+  }catch(err){
+    list.innerHTML=`<div class="log-empty">Spots konnten nicht geladen werden.<br><small>${spotEsc(err.message)}</small></div>`;
+  }
+}
+
+function revokeSpotObjectUrls(){
+  for(const url of spotObjectUrls){try{URL.revokeObjectURL(url)}catch{}}
+  spotObjectUrls=[];
+}
+
+async function spotMediaBlobUrl(spotId,mediaId){
+  const r=await fetch(`${JIGGY_CLOUD.apiUrl}/api/spots/${encodeURIComponent(spotId)}/media/${encodeURIComponent(mediaId)}`);
+  if(!r.ok){
+    let msg=`Bild konnte nicht geladen werden (${r.status})`;
+    try{const d=await r.json();if(d?.error)msg=d.error}catch{}
+    throw new Error(msg);
+  }
+  const blob=await r.blob();
+  const url=URL.createObjectURL(blob);
+  spotObjectUrls.push(url);
+  return url;
+}
+
+function renderSpotDetailImage(){
+  const img=$("spotDetailImage");
+  const empty=$("spotDetailNoImage");
+  const count=$("spotDetailCounter");
+  const prev=$("spotDetailPrev"),next=$("spotDetailNext");
+  const thumbs=$("spotDetailThumbs");
+  if(!img||!empty)return;
+
+  if(!activeSpotMedia.length){
+    img.hidden=true;
+    img.style.display="none";
+    empty.hidden=false;
+    empty.style.display="grid";
+    if(count)count.hidden=true;
+    if(prev)prev.hidden=true;if(next)next.hidden=true;
+    if(thumbs)thumbs.innerHTML="";
+    return;
+  }
+  const item=activeSpotMedia[activeSpotMediaIndex];
+  img.src=item.url;img.alt=activeSpotDetail?.name||"JIGGY Spot";
+  img.hidden=false;
+  img.style.display="block";
+  empty.hidden=true;
+  empty.style.display="none";
+  if(count){
+    count.hidden=activeSpotMedia.length<=1;
+    count.textContent=`${activeSpotMediaIndex+1} / ${activeSpotMedia.length}`;
+  }
+  if(prev)prev.hidden=activeSpotMedia.length<=1;
+  if(next)next.hidden=activeSpotMedia.length<=1;
+  if(thumbs){
+    thumbs.innerHTML=activeSpotMedia.map((m,i)=>`<button class="spot-detail-thumb ${i===activeSpotMediaIndex?"active":""}" type="button" data-spot-media-index="${i}"><img src="${m.url}" alt=""></button>`).join("");
+    thumbs.querySelectorAll("[data-spot-media-index]").forEach(b=>b.onclick=()=>{
+      activeSpotMediaIndex=Number(b.dataset.spotMediaIndex)||0;
+      renderSpotDetailImage();
+    });
+  }
+}
+
+
+function currentUserOwnsSpot(spot){
+  const userId=accountSession()?.user?.id;
+  return !!(userId&&spot?.userId&&String(userId)===String(spot.userId));
+}
+
+async function openSpotDetail(spotOrId){
+  const spot=typeof spotOrId==="string"?spotsCache.find(s=>s.id===spotOrId):spotOrId;
+  if(!spot)return;
+  activeSpotDetail=spot;
+  activeSpotMediaIndex=0;
+  revokeSpotObjectUrls();
+  activeSpotMedia=[];
+
+  if($("spotDetailImage")){
+    $("spotDetailImage").src="";
+    $("spotDetailImage").hidden=true;
+    $("spotDetailImage").style.display="none";
+  }
+  if($("spotDetailNoImage")){
+    $("spotDetailNoImage").hidden=false;
+    $("spotDetailNoImage").style.display="grid";
+  }
+
+  $("spotDetailName").textContent=spot.name||"JIGGY Spot";
+  $("spotDetailCategory").textContent=spot.category||"JIGGY SPOT";
+  $("spotDetailDescription").textContent=spot.description||"Keine Beschreibung hinterlegt.";
+  $("spotDetailTypeBadge").textContent=`${spotTypeIcon(spot)} ${spotTypeLabel(spot)}`;
+  $("spotDetailVisibilityBadge").textContent=spot.visibility==="private"?"🔒 Privat":spot.visibility==="link"?"🔗 Nur per Link":"🌍 Öffentlich";
+  $("spotDetailAccess").textContent=spot.isCarAccessible?"🚗 Mit dem Auto erreichbar":"🚶 Nicht direkt mit dem Auto erreichbar";
+  $("spotDetailCoords").textContent=`${Number(spot.latitude).toFixed(6)}, ${Number(spot.longitude).toFixed(6)}`;
+
+  if($("spotOwnerActions")){
+    $("spotOwnerActions").hidden=!currentUserOwnsSpot(spot);
+  }
+
+  const dateWrap=$("spotDetailDateWrap");
+  const recurWrap=$("spotDetailRecurringWrap");
+  if(spot.spotType==="meet"){
+    dateWrap.hidden=!spot.eventStart;
+    dateWrap.style.display=spot.eventStart?"grid":"none";
+    if(spot.eventStart){
+      let txt=spotDateLabel(spot);
+      if(spot.eventEnd){
+        try{
+          const end=new Intl.DateTimeFormat("de-DE",{dateStyle:"medium",timeStyle:"short"}).format(new Date(spot.eventEnd));
+          txt+=` – ${end}`;
+        }catch{}
+      }
+      $("spotDetailDate").textContent=txt;
+    }
+
+    recurWrap.hidden=false;
+    recurWrap.style.display="grid";
+    $("spotDetailRecurring").textContent=spot.recurring?"🔁 Regelmäßiges Treffen":"📅 Einmaliges / loses Treffen";
+  }else{
+    dateWrap.hidden=true;
+    dateWrap.style.display="none";
+    recurWrap.hidden=true;
+    recurWrap.style.display="none";
+  }
+
+  $("spotDetailMessage").textContent="Bilder werden geladen …";
+  $("spotDetailMessage").className="cloud-message";
+  $("spotDetailModal").classList.add("open");
+  $("spotDetailModal").setAttribute("aria-hidden","false");
+  renderSpotDetailImage();
+  loadMeetAttendance(spot);
+
+  try{
+    const data=await cloudRequest(`/api/spots/${encodeURIComponent(spot.id)}/media`);
+    const media=Array.isArray(data.media)?data.media:[];
+    const loaded=[];
+    for(const m of media){
+      try{
+        const mediaId=m.mediaId||m.media_id||m.id;
+        if(!mediaId)continue;
+        const url=await spotMediaBlobUrl(spot.id,mediaId);
+        loaded.push({...m,mediaId,url});
+      }catch(err){console.warn("Spot image load:",err)}
+    }
+    activeSpotMedia=loaded;
+    activeSpotMediaIndex=0;
+
+    const hero=$("spotDetailImage");
+    const empty=$("spotDetailNoImage");
+    if(loaded.length){
+      hero.src=loaded[0].url;
+      hero.alt=activeSpotDetail?.name||"JIGGY Spot";
+      hero.hidden=false;
+      empty.hidden=true;
+    }else{
+      hero.src="";
+      hero.hidden=true;
+      empty.hidden=false;
+    }
+
+    renderSpotDetailImage();
+    $("spotDetailMessage").textContent=loaded.length?`${loaded.length} Foto${loaded.length===1?"":"s"} geladen.`:"Für diesen Spot wurde noch kein Bild hochgeladen.";
+    $("spotDetailMessage").className=`cloud-message ${loaded.length?"good":""}`;
+  }catch(err){
+    console.error(err);
+    $("spotDetailMessage").textContent=err.message||"Bilder konnten nicht geladen werden.";
+    $("spotDetailMessage").className="cloud-message bad";
+  }
+}
+
+function closeSpotDetail(){
+  $("spotDetailModal")?.classList.remove("open");
+  $("spotDetailModal")?.setAttribute("aria-hidden","true");
+  activeSpotDetail=null;activeSpotMedia=[];activeSpotMediaIndex=0;
+  revokeSpotObjectUrls();
+  if($("spotDetailImage")){$("spotDetailImage").src="";$("spotDetailImage").hidden=true}
+}
+
+$("spotDetailClose")?.addEventListener("click",closeSpotDetail);
+$("spotDetailModal")?.addEventListener("click",e=>{if(e.target===$("spotDetailModal"))closeSpotDetail()});
+$("spotDetailPrev")?.addEventListener("click",()=>{
+  if(!activeSpotMedia.length)return;
+  activeSpotMediaIndex=(activeSpotMediaIndex-1+activeSpotMedia.length)%activeSpotMedia.length;
+  renderSpotDetailImage();
+});
+$("spotDetailNext")?.addEventListener("click",()=>{
+  if(!activeSpotMedia.length)return;
+  activeSpotMediaIndex=(activeSpotMediaIndex+1)%activeSpotMedia.length;
+  renderSpotDetailImage();
+});
+$("spotDetailFly")?.addEventListener("click",()=>{
+  if(!activeSpotDetail||!spotsMap)return;
+  const s=activeSpotDetail;
+  closeSpotDetail();
+  spotsMap.flyTo({center:[Number(s.longitude),Number(s.latitude)],zoom:16});
+});
+
+
+$("spotMeetJoin")?.addEventListener("click",async()=>{
+  const spot=activeSpotDetail;
+  if(!spot||spot.spotType!=="meet")return;
+  if(isPastMeet(spot)){
+    toast("Das Treffen ist bereits vorbei","warn");
+    return;
+  }
+  const session=accountSession();
+  if(!session?.token){
+    toast("Bitte zuerst bei JIGGY anmelden","warn");
+    return;
+  }
+
+  const btn=$("spotMeetJoin");
+  if(btn)btn.disabled=true;
+
+  try{
+    const joining=!activeMeetAttendance.joined;
+    const out=await authCloudRequest(`/api/spots/${encodeURIComponent(spot.id)}/attendees`,{
+      method:joining?"POST":"DELETE"
+    });
+    activeMeetAttendance={
+      count:Number(out.count||0),
+      joined:!!out.joined
+    };
+    if($("spotMeetCount")){
+      $("spotMeetCount").textContent=activeMeetAttendance.count===0
+        ?"Noch niemand eingetragen."
+        :`${activeMeetAttendance.count} ${activeMeetAttendance.count===1?"Person ist":"Leute sind"} dabei.`;
+    }
+    if(btn){
+      btn.textContent=activeMeetAttendance.joined?"✓ Dabei – absagen":"🚗 Ich bin dabei";
+      btn.classList.toggle("joined",activeMeetAttendance.joined);
+    }
+    toast(activeMeetAttendance.joined?"Du bist dabei 🚗🔥":"Teilnahme abgesagt");
+  }catch(err){
+    console.error(err);
+    toast(err.message||"Teilnahme konnte nicht geändert werden","warn");
+  }finally{
+    if(btn)btn.disabled=false;
+  }
+});
+
+$("spotDetailDelete")?.addEventListener("click",async()=>{
+  const spot=activeSpotDetail;
+  if(!spot||!currentUserOwnsSpot(spot)){
+    toast("Du kannst nur deine eigenen Spots löschen","warn");
+    return;
+  }
+
+  const ok=window.confirm(
+    `„${spot.name}“ wirklich löschen?\n\nDer Spot wird aus JIGGY Spots entfernt.`
+  );
+  if(!ok)return;
+
+  const btn=$("spotDetailDelete");
+  const msg=$("spotDetailMessage");
+  if(btn){btn.disabled=true;btn.textContent="Lösche …"}
+  if(msg){
+    msg.textContent="Spot wird gelöscht …";
+    msg.className="cloud-message";
+  }
+
+  try{
+    await authCloudRequest(`/api/spots/${encodeURIComponent(spot.id)}`,{
+      method:"DELETE"
+    });
+
+    closeSpotDetail();
+    toast("Spot gelöscht 🗑");
+    await loadSpots();
+  }catch(err){
+    console.error(err);
+    if(msg){
+      msg.textContent=err.message||"Spot konnte nicht gelöscht werden.";
+      msg.className="cloud-message bad";
+    }
+  }finally{
+    if(btn){
+      btn.disabled=false;
+      btn.textContent="🗑 Spot löschen";
+    }
+  }
+});
+
+
+function isPastMeet(spot){
+  if(spot?.spotType!=="meet")return false;
+  const raw=spot.eventEnd||spot.eventStart;
+  if(!raw)return false;
+  const d=new Date(raw);
+  return !Number.isNaN(d.getTime()) && d.getTime()<Date.now();
+}
+function sameLocalDay(a,b){
+  return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();
+}
+function inCurrentWeek(d){
+  const now=new Date();
+  const start=new Date(now);
+  const day=(start.getDay()+6)%7;
+  start.setHours(0,0,0,0);
+  start.setDate(start.getDate()-day);
+  const end=new Date(start);
+  end.setDate(end.getDate()+7);
+  return d>=start&&d<end;
+}
+function meetWhenMatches(spot,filter){
+  if(!filter)return true;
+  if(spot?.spotType!=="meet")return false;
+  const raw=spot.eventStart;
+  if(!raw)return filter==="upcoming" ? !isPastMeet(spot) : false;
+  const d=new Date(raw);
+  if(Number.isNaN(d.getTime()))return false;
+  if(filter==="past")return isPastMeet(spot);
+  if(filter==="upcoming")return !isPastMeet(spot);
+  if(filter==="today")return sameLocalDay(d,new Date());
+  if(filter==="week")return inCurrentWeek(d);
+  return true;
+}
+
+async function loadMeetAttendance(spot){
+  const card=$("spotMeetCard");
+  if(!card)return;
+  if(spot?.spotType!=="meet"){
+    card.hidden=true;
+    return;
+  }
+
+  card.hidden=false;
+  activeMeetAttendance={count:0,joined:false};
+  const countEl=$("spotMeetCount");
+  const btn=$("spotMeetJoin");
+
+  if(isPastMeet(spot)){
+    if(btn){btn.disabled=true;btn.textContent="✓ Treffen vorbei"}
+  }else{
+    if(btn){btn.disabled=false;btn.textContent="🚗 Ich bin dabei"}
+  }
+  if(countEl)countEl.textContent="Teilnehmer werden geladen …";
+
+  try{
+    const session=accountSession();
+    const headers={};
+    if(session?.token)headers.Authorization=`Bearer ${session.token}`;
+
+    const r=await fetch(`${JIGGY_CLOUD.apiUrl}/api/spots/${encodeURIComponent(spot.id)}/attendees`,{headers});
+    const text=await r.text();
+    let data={}; try{data=text?JSON.parse(text):{}}catch{}
+    if(!r.ok)throw new Error(data.error||`Teilnehmer konnten nicht geladen werden (${r.status})`);
+
+    activeMeetAttendance={
+      count:Number(data.count||0),
+      joined:!!data.joined
+    };
+
+    if(countEl){
+      countEl.textContent=activeMeetAttendance.count===0
+        ?"Noch niemand eingetragen."
+        :`${activeMeetAttendance.count} ${activeMeetAttendance.count===1?"Person ist":"Leute sind"} dabei.`;
+    }
+
+    if(btn&&!isPastMeet(spot)){
+      btn.disabled=false;
+      btn.textContent=activeMeetAttendance.joined?"✓ Dabei – absagen":"🚗 Ich bin dabei";
+      btn.classList.toggle("joined",activeMeetAttendance.joined);
+    }
+  }catch(err){
+    console.warn("Meet attendance:",err);
+    if(countEl)countEl.textContent="Teilnehmer derzeit nicht verfügbar.";
+    if(btn&&!isPastMeet(spot))btn.disabled=false;
+  }
+}
+
+function renderSpots(){
+  const cat=$("spotsCategory")?.value||"";
+  const meetWhen=$("spotsMeetWhen")?.value||"";
+  const rows=spotsCache.filter(s=>
+    (!cat||s.category===cat)&&
+    (!spotsTypeFilter||s.spotType===spotsTypeFilter)&&
+    meetWhenMatches(s,meetWhen)
+  );
+  $("spotsCount").textContent=`${rows.length} gefunden`;
+  spotsMarkers.forEach(m=>m.remove());spotsMarkers=[];
+  for(const s of rows){
+    const el=document.createElement("button");
+    el.className=`spot-map-marker ${s.spotType==="meet"?"meet":"photo"}`;
+    el.type="button";
+    el.textContent=spotTypeIcon(s);
+    const extra=spotDateLabel(s);
+    const marker=new maplibregl.Marker({element:el})
+      .setLngLat([Number(s.longitude),Number(s.latitude)])
+      .addTo(spotsMap);
+    el.addEventListener("click",ev=>{ev.stopPropagation();openSpotDetail(s)});
+    spotsMarkers.push(marker);
+  }
+
+  $("spotsList").innerHTML=rows.length?rows.map(s=>{
+    const date=spotDateLabel(s);
+    return `<button class="spot-row" type="button" data-spot-id="${spotEsc(s.id)}">
+      <span class="spot-pin">${spotTypeIcon(s)}</span>
+      <span>
+        <strong>${spotEsc(s.name)}${isPastMeet(s)?' <span class="spot-past-label">Vorbei</span>':""}</strong>
+        <small>${spotEsc(s.category||spotTypeLabel(s))}${date?` · ${spotEsc(date)}`:""} · ${s.isCarAccessible?"Mit Auto erreichbar":"Zu Fuß"}</small>
+      </span>
+      <b>›</b>
+    </button>`;
+  }).join(""):'<div class="log-empty">Hier gibt es noch nichts. Zeit, den ersten Spot einzutragen. 📍</div>';
+
+  document.querySelectorAll(".spot-row").forEach(el=>el.onclick=()=>{
+    const s=spotsCache.find(x=>x.id===el.dataset.spotId);if(!s)return;
+    openSpotDetail(s);
+  });
+}
+
+function setSpotCoords(lat,lon,moveMarker=true){
+  pendingSpotCoords={latitude:Number(lat),longitude:Number(lon)};
+  if($("spotFormCoords"))$("spotFormCoords").textContent=`${pendingSpotCoords.latitude.toFixed(6)}, ${pendingSpotCoords.longitude.toFixed(6)}`;
+  if(moveMarker&&spotsMap){
+    if(!spotDraftMarker){
+      const el=document.createElement("div");
+      el.className="spot-draft-marker";
+      el.textContent="📍";
+      spotDraftMarker=new maplibregl.Marker({element:el,draggable:true})
+        .setLngLat([pendingSpotCoords.longitude,pendingSpotCoords.latitude])
+        .addTo(spotsMap);
+      spotDraftMarker.on("dragend",()=>{
+        const p=spotDraftMarker.getLngLat();
+        setSpotCoords(p.lat,p.lng,false);
+      });
+    }else{
+      spotDraftMarker.setLngLat([pendingSpotCoords.longitude,pendingSpotCoords.latitude]);
+    }
+  }
+}
+function setSpotCoordsFromMap(){
+  if(!spotsMap)return;
+  const c=spotsMap.getCenter();
+  setSpotCoords(c.lat,c.lng,true);
+}
+function startSpotPickMode(){
+  if(!spotsMap)return;
+  spotPickMode=true;
+  closeSpotCreateModal(false);
+  spotsMap.getCanvas().style.cursor="crosshair";
+  toast("Klick auf die gewünschte Stelle auf der Karte 📍");
+}
+function stopSpotPickMode(){
+  spotPickMode=false;
+  if(spotsMap)spotsMap.getCanvas().style.cursor="";
+}
+
+function updateSpotKindUI(){
+  const type=document.querySelector('input[name="spotType"]:checked')?.value||"photo";
+  document.querySelectorAll(".spots-kind").forEach(el=>el.classList.toggle("active",el.querySelector("input")?.checked));
+  if($("spotMeetFields"))$("spotMeetFields").hidden=type!=="meet";
+  if($("spotFormCategory")){
+    const select=$("spotFormCategory");
+    if(type==="meet"&&!["Treffpunkt","Car Meet"].includes(select.value)){
+      select.innerHTML='<option value="Treffpunkt">Treffpunkt</option><option value="Car Meet">Car Meet</option><option value="Parkhaus">Parkhaus</option><option value="Industrie">Industrie</option><option value="Urban">Urban</option>';
+      select.value="Treffpunkt";
+    }else if(type==="photo"&&["Treffpunkt","Car Meet"].includes(select.value)){
+      select.innerHTML='<option value="Urban">Urban</option><option value="Industrie">Industrie</option><option value="Natur">Natur</option><option value="Parkhaus">Parkhaus</option><option value="Nacht">Nacht</option><option value="Aussicht">Aussicht</option>';
+      select.value="Urban";
+    }
+  }
+}
+function openSpotCreateModal(preserveCoords=false){
+  if(!accountSession().token){
+    toast("Bitte zuerst bei JIGGY anmelden","warn");
+    show("more");
+    return;
+  }
+  if(!preserveCoords)setSpotCoordsFromMap();
+  $("spotsCreateForm")?.reset();
+  const photo=document.querySelector('input[name="spotType"][value="photo"]');if(photo)photo.checked=true;
+  if($("spotFormCarAccessible"))$("spotFormCarAccessible").checked=true;
+  if($("spotFormVisibility"))$("spotFormVisibility").value="public";
+  if($("spotImageStatus"))$("spotImageStatus").textContent="Noch keine Fotos ausgewählt.";
+  if($("spotFormMessage")){$("spotFormMessage").textContent="Wähle einen Typ und trage deinen Spot ein.";$("spotFormMessage").className="cloud-message"}
+  updateSpotKindUI();
+  if(!pendingSpotCoords)setSpotCoordsFromMap();
+  else setSpotCoords(pendingSpotCoords.latitude,pendingSpotCoords.longitude,true);
+  const modal=$("spotsCreateModal");
+  modal?.classList.add("open");
+  modal?.setAttribute("aria-hidden","false");
+
+  modal?.querySelectorAll("input, textarea, select, button").forEach(el=>{
+    if(el.id!=="spotsModalSave") el.disabled=false;
+  });
+
+  setTimeout(()=>{
+    const name=$("spotFormName");
+    if(name){
+      name.disabled=false;
+      name.readOnly=false;
+      name.focus();
+      name.click();
+    }
+  },80);
+}
+function closeSpotCreateModal(removeDraft=true){
+  $("spotsCreateModal")?.classList.remove("open");
+  $("spotsCreateModal")?.setAttribute("aria-hidden","true");
+  if(removeDraft){
+    stopSpotPickMode();
+    if(spotDraftMarker){spotDraftMarker.remove();spotDraftMarker=null}
+    pendingSpotCoords=null;
+  }
+}
+function localDateToISO(value){
+  if(!value)return null;
+  const d=new Date(value);
+  return Number.isNaN(d.getTime())?null:d.toISOString();
+}
+async function uploadSpotImages(spotId,files){
+  const session=accountSession();
+  if(!session.token||!spotId||!files?.length)return 0;
+  let done=0;
+  for(const file of files){
+    const form=new FormData();
+    form.append("file",file);
+    const r=await fetch(`${JIGGY_CLOUD.apiUrl}/api/spots/${encodeURIComponent(spotId)}/media`,{
+      method:"POST",
+      headers:{Authorization:`Bearer ${session.token}`},
+      body:form
+    });
+    const text=await r.text();let data={};try{data=text?JSON.parse(text):{}}catch{}
+    if(!r.ok)throw new Error(data.error||`Foto-Upload fehlgeschlagen (${r.status})`);
+    done++;
+    if($("spotImageStatus"))$("spotImageStatus").textContent=`${done} von ${files.length} Fotos hochgeladen …`;
+  }
+  return done;
+}
+
+$("spotsAdd")?.addEventListener("click",()=>openSpotCreateModal(false));
+$("spotsModalClose")?.addEventListener("click",closeSpotCreateModal);
+$("spotsModalCancel")?.addEventListener("click",closeSpotCreateModal);
+$("spotsCreateModal")?.addEventListener("click",e=>{
+  if(e.target===$("spotsCreateModal"))closeSpotCreateModal();
+});
+$("spotsCreateModal")?.querySelector(".spots-modal-panel")?.addEventListener("click",e=>e.stopPropagation());
+$("spotPickOnMap")?.addEventListener("click",startSpotPickMode);
+document.querySelectorAll('input[name="spotType"]').forEach(el=>el.addEventListener("change",updateSpotKindUI));
+$("spotFormImages")?.addEventListener("change",()=>{
+  const n=$("spotFormImages")?.files?.length||0;
+  if($("spotImageStatus"))$("spotImageStatus").textContent=n?`${n} Foto${n===1?"":"s"} ausgewählt.`:"Noch keine Fotos ausgewählt.";
+});
+
+$("spotsCreateForm")?.addEventListener("submit",async e=>{
+  e.preventDefault();
+  const btn=$("spotsModalSave"),msg=$("spotFormMessage");
+  const type=document.querySelector('input[name="spotType"]:checked')?.value||"photo";
+  if(!pendingSpotCoords){setSpotCoordsFromMap()}
+  const files=[...($("spotFormImages")?.files||[])];
+  const payload={
+    name:$("spotFormName")?.value.trim(),
+    description:$("spotFormDescription")?.value.trim()||"",
+    latitude:pendingSpotCoords?.latitude,
+    longitude:pendingSpotCoords?.longitude,
+    category:$("spotFormCategory")?.value||null,
+    visibility:$("spotFormVisibility")?.value||"public",
+    isCarAccessible:!!$("spotFormCarAccessible")?.checked,
+    spotType:type,
+    eventStart:type==="meet"?localDateToISO($("spotFormStart")?.value):null,
+    eventEnd:type==="meet"?localDateToISO($("spotFormEnd")?.value):null,
+    recurring:type==="meet"&&!!$("spotFormRecurring")?.checked
+  };
+  if(!payload.name)return;
+  btn.disabled=true;btn.textContent="Speichere …";
+  if(msg){msg.textContent="Spot wird in JIGGY Cloud gespeichert …";msg.className="cloud-message"}
+  try{
+    const out=await authCloudRequest("/api/spots",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+    const created=out.spot;
+    if(files.length){
+      btn.textContent="Fotos werden geladen …";
+      await uploadSpotImages(created.id,files);
+    }
+    if(msg){msg.textContent=`${type==="meet"?"Treffen":"Fotospot"} gespeichert${files.length?` · ${files.length} Foto${files.length===1?"":"s"}`:""}.`;msg.className="cloud-message good"}
+    toast(type==="meet"?"Treffen gespeichert 🚗":"Fotospot gespeichert 📸");
+    await loadSpots();
+    if(spotsMap&&created)spotsMap.flyTo({center:[Number(created.longitude),Number(created.latitude)],zoom:15});
+    setTimeout(()=>closeSpotCreateModal(true),650);
+  }catch(err){
+    console.error(err);
+    if(msg){msg.textContent=err.message||"Spot konnte nicht gespeichert werden";msg.className="cloud-message bad"}
+  }finally{
+    btn.disabled=false;btn.textContent="Spot speichern";
+  }
+});
+
+$("spotsLocate")?.addEventListener("click",()=>{
+  if(!navigator.geolocation)return toast("Standort nicht verfügbar","warn");
+  navigator.geolocation.getCurrentPosition(
+    p=>spotsMap?.flyTo({center:[p.coords.longitude,p.coords.latitude],zoom:14}),
+    ()=>toast("Standort konnte nicht ermittelt werden","warn"),
+    {enableHighAccuracy:true,timeout:8000}
+  );
+});
+$("spotsRefresh")?.addEventListener("click",loadSpots);
+$("spotsCategory")?.addEventListener("change",renderSpots);
+$("spotsMeetWhen")?.addEventListener("change",renderSpots);
+document.querySelectorAll("[data-spots-type]").forEach(btn=>btn.addEventListener("click",()=>{
+  spotsTypeFilter=btn.dataset.spotsType||"";
+  document.querySelectorAll("[data-spots-type]").forEach(x=>x.classList.toggle("active",x===btn));
+  renderSpots();
+}));
+
 $("publishProfileBtn")?.addEventListener("click",async()=>{
   const c=car($("profileCar").value),btn=$("publishProfileBtn"),status=$("profilePublishStatus");
   if(!c)return toast("Kein Fahrzeug ausgewählt","warn");
@@ -1150,9 +2746,38 @@ $("publishProfileBtn")?.addEventListener("click",async()=>{
   finally{btn.disabled=false;btn.textContent=profileConfig().profileId?"Änderungen speichern":"Profil veröffentlichen"}
 });
 $("copyProfileBtn")?.addEventListener("click",async()=>{
-  const p=profileConfig();if(!accountSession().token||!p.profileId)return;
-  const url=`${JIGGY_CLOUD.baseUrl}${JIGGY_CLOUD.baseUrl.includes("?")?"&":"?"}id=${encodeURIComponent(p.profileId)}`;
-  try{if(window.myGarageDesktop?.copyText){const r=await window.myGarageDesktop.copyText(url);if(!r?.ok)throw new Error(r?.error||"Kopieren fehlgeschlagen")}else if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(url)}else throw new Error("Clipboard nicht verfügbar");toast("Profil-Link kopiert")}catch{prompt("Profil-Link:",url)}
+  const p=profileConfig();
+  if(!accountSession().token||!p.profileId)return;
+
+  let slug=normalizeProfileSlug($("profileSlug")?.value);
+
+  // Prefer the slug stored on the server, so the copied URL is always
+  // exactly the pretty profile URL that belongs to this account.
+  try{
+    const out=await authCloudRequest("/api/profiles/me/slug");
+    if(out?.slug){
+      slug=normalizeProfileSlug(out.slug);
+      if($("profileSlug"))$("profileSlug").value=slug;
+    }
+  }catch{}
+
+  const url=slug
+    ? `https://jiggy-cloud.org/u/${encodeURIComponent(slug)}`
+    : `${JIGGY_CLOUD.baseUrl}${JIGGY_CLOUD.baseUrl.includes("?")?"&":"?"}id=${encodeURIComponent(p.profileId)}`;
+
+  try{
+    if(window.myGarageDesktop?.copyText){
+      const r=await window.myGarageDesktop.copyText(url);
+      if(!r?.ok)throw new Error(r?.error||"Kopieren fehlgeschlagen");
+    }else if(navigator.clipboard?.writeText){
+      await navigator.clipboard.writeText(url);
+    }else{
+      throw new Error("Clipboard nicht verfügbar");
+    }
+    toast("Profil-Link kopiert");
+  }catch{
+    prompt("Profil-Link:",url);
+  }
 });
 $("unpublishProfileBtn")?.addEventListener("click",async()=>{
   const p=profileConfig();if(!accountSession().token||!p.profileId||!confirm("Öffentliches Profil wirklich offline nehmen?"))return;

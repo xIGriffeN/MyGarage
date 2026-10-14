@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>JIGGY</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=216d-fuel-fallback">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.7.1/dist/maplibre-gl.css">
 </head>
 <body>
   <aside class="sidebar" id="sidebar">
@@ -33,6 +34,8 @@
     <button class="nav" data-view="build"><span>🔧</span><b>Umbauten</b></button>
     <button class="nav" data-view="logbook"><span>📸</span><b>Logbuch</b></button>
     <button class="nav" data-view="stats"><span>📊</span><b>Statistiken</b></button>
+    <button class="nav" data-view="jobs"><span>🧾</span><b>Jobs</b></button>
+    <button class="nav" data-view="spots"><span>📍</span><b>Spots</b></button>
     <button class="nav" data-view="profile"><span>↗</span><b>Public Profile</b></button>
     <button class="nav" data-view="more"><span>•••</span><b>Mehr</b></button>
   </aside>
@@ -200,6 +203,169 @@
       </div>
     </section>
 
+
+    <section id="jobsView" class="view">
+      <div class="jobs-hero card">
+        <div>
+          <span class="feature-kicker">JIGGY JOBS</span>
+          <h2>Aufträge & Arbeitszeiten</h2>
+          <p class="muted">Kundenfahrzeuge, Arbeitszeit und Material unabhängig von deiner Garage verwalten.</p>
+        </div>
+        <button class="primary" id="jobCreateOpen" type="button">＋ Neuer Auftrag</button>
+      </div>
+
+      <div class="jobs-kpis jobs-kpis-summary">
+        <div class="card job-kpi income-kpi"><span>Gesamte Einnahmen</span><strong id="jobsIncomeTotal">–</strong><small>inkl. Trinkgeld</small></div>
+        <div class="card job-kpi profit-kpi"><span>Gesamter Verdienst</span><strong id="jobsProfitTotal">–</strong><small>nach Material-EK</small></div>
+        <div class="card job-kpi"><span>Trinkgeld gesamt</span><strong id="jobsTipsTotal">–</strong><small id="jobsPaidCount">– bezahlte Jobs</small></div>
+        <div class="card job-kpi"><span>Noch offen</span><strong id="jobsOpenAmount">–</strong><small id="jobsOpenCount">– offene Jobs</small></div>
+      </div>
+
+      <div class="jobs-toolbar card">
+        <div class="jobs-search-wrap">
+          <span>⌕</span>
+          <input id="jobsSearch" placeholder="Kunde, Fahrzeug, Kennzeichen oder Auftrag suchen …">
+        </div>
+        <select id="jobsStatusFilter">
+          <option value="">Alle Status</option>
+          <option value="draft">Entwurf</option>
+          <option value="open">Offen</option>
+          <option value="in_progress">In Arbeit</option>
+          <option value="completed">Fertig</option>
+          <option value="invoiced">Abgerechnet</option>
+          <option value="paid">Bezahlt</option>
+          <option value="cancelled">Storniert</option>
+        </select>
+        <button class="btn" id="jobsRefresh" type="button">↻</button>
+      </div>
+
+      <div class="jobs-layout">
+        <div class="card jobs-list-card">
+          <div class="card-head"><div><h3>Aufträge</h3><span id="jobsCount">0 Jobs</span></div></div>
+          <div id="jobsList" class="jobs-list"><div class="log-empty">Jobs werden geladen …</div></div>
+        </div>
+
+        <div class="card job-detail-card">
+          <div id="jobDetailEmpty" class="job-detail-empty">
+            <span>🧾</span>
+            <h3>Auftrag auswählen</h3>
+            <p class="muted">Wähle links einen Job aus oder lege einen neuen Auftrag an.</p>
+          </div>
+
+          <div id="jobDetail" hidden>
+            <div class="job-detail-head">
+              <div>
+                <span class="feature-kicker">AUFTRAG</span>
+                <h2 id="jobDetailTitle">–</h2>
+                <div id="jobDetailMeta" class="job-detail-meta"></div>
+              </div>
+              <span id="jobDetailStatus" class="job-status">–</span>
+            </div>
+
+            <div class="job-contact-grid">
+              <div class="job-info-box">
+                <small>KUNDE</small>
+                <strong id="jobCustomerName">–</strong>
+                <span id="jobCustomerContact">–</span>
+              </div>
+              <div class="job-info-box">
+                <small>FAHRZEUG</small>
+                <strong id="jobVehicleName">–</strong>
+                <span id="jobVehicleInfo">–</span>
+              </div>
+            </div>
+
+            <div class="job-total-strip">
+              <div><span>Arbeitszeit</span><strong id="jobTotalTime">0:00 h</strong></div>
+              <div><span>Arbeit</span><strong id="jobLabor">0,00 €</strong></div>
+              <div><span>Material</span><strong id="jobMaterials">0,00 €</strong></div>
+              <div class="grand"><span>Gesamt</span><strong id="jobTotal">0,00 €</strong></div>
+            </div>
+
+            <div class="job-payment-card" id="jobPaymentCard">
+              <div class="job-payment-head">
+                <div><span class="feature-kicker">ZAHLUNG</span><h3 id="jobPaymentState">Noch offen</h3></div>
+                <button class="primary" id="jobMarkPaid" type="button">✓ Als bezahlt markieren</button>
+              </div>
+              <div class="job-payment-grid">
+                <div><span>Auftragswert</span><strong id="jobOrderValue">0,00 €</strong></div>
+                <div><span>Bezahlt</span><strong id="jobPaidAmount">–</strong></div>
+                <div><span>Trinkgeld</span><strong id="jobTipAmount">0,00 €</strong></div>
+                <div><span>Einnahme</span><strong id="jobIncome">0,00 €</strong></div>
+                <div><span>Material-EK</span><strong id="jobPurchaseCost">0,00 €</strong></div>
+                <div class="profit"><span>Plus / Verdienst</span><strong id="jobProfit">0,00 €</strong></div>
+              </div>
+              <div id="jobPaymentMeta" class="job-payment-meta"></div>
+            </div>
+
+            <div class="job-detail-actions">
+              <button class="btn" id="jobEditOpen" type="button">✏️ Auftrag bearbeiten</button>
+              <button class="mini danger" id="jobDeleteBtn" type="button">🗑 Auftrag löschen</button>
+              <button class="primary" id="jobAddWork" type="button">＋ Arbeitszeit</button>
+              <button class="btn" id="jobAddMaterial" type="button">＋ Material</button>
+              <button class="btn" id="jobCreateInvoice" type="button">🧾 Rechnung erstellen</button><button class="btn" id="jobOpenInvoice" type="button" hidden>↗ Rechnung öffnen</button>
+            </div>
+
+            <div class="job-sections-grid">
+              <div>
+                <div class="card-head compact"><div><h3>Arbeitszeiten</h3><span id="jobWorkCount">0 Einträge</span></div></div>
+                <div id="jobWorkList" class="job-line-list"></div>
+              </div>
+              <div>
+                <div class="card-head compact"><div><h3>Material & Teile</h3><span id="jobMaterialCount">0 Positionen</span></div></div>
+                <div id="jobMaterialList" class="job-line-list"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="spotsView" class="view">
+      <div class="spots-head card">
+        <div>
+          <span class="feature-kicker">JIGGY COMMUNITY</span>
+          <h3>JIGGY Spots</h3>
+          <p class="muted">Fotospots &amp; Treffpunkte für die Car-Community.</p>
+        </div>
+        <div class="spots-actions">
+          <button class="btn" id="spotsLocate" type="button">◎ Mein Standort</button>
+          <button class="primary" id="spotsAdd" type="button">＋ Spot hinzufügen</button>
+        </div>
+      </div>
+
+      <div class="spots-layout">
+        <div class="card spots-map-card">
+          <div id="spotsMap"></div>
+        </div>
+        <aside class="card spots-panel">
+          <div class="card-head"><div><h3>Spots</h3><span id="spotsCount">0 gefunden</span></div></div>
+          <div class="spots-type-tabs">
+            <button class="mini active" type="button" data-spots-type="">Alle</button>
+            <button class="mini" type="button" data-spots-type="photo">📸 Fotospots</button>
+            <button class="mini" type="button" data-spots-type="meet">🚗 Treffen</button>
+          </div>
+          <div class="spots-filter">
+            <select id="spotsMeetWhen">
+              <option value="">Alle Termine</option>
+              <option value="upcoming">Kommende Treffen</option>
+              <option value="today">Heute</option>
+              <option value="week">Diese Woche</option>
+              <option value="past">Vergangene Treffen</option>
+            </select>
+            <select id="spotsCategory">
+              <option value="">Alle Kategorien</option>
+              <option>Industrie</option><option>Urban</option><option>Natur</option>
+              <option>Parkhaus</option><option>Nacht</option><option>Aussicht</option>
+              <option>Treffpunkt</option><option>Car Meet</option>
+            </select>
+            <button class="btn" id="spotsRefresh" type="button">↻</button>
+          </div>
+          <div id="spotsList" class="spots-list"><div class="log-empty">Spots werden geladen …</div></div>
+        </aside>
+      </div>
+    </section>
+
     <section id="serviceView" class="view">
       <div class="section-grid">
         <div class="card">
@@ -252,20 +418,197 @@
     </section>
 
     <section id="fuelView" class="view">
-      <div class="section-grid">
-        <div class="card">
-          <div class="card-head"><h3>Tankung eintragen</h3></div>
-          <form id="fuelForm">
-            <label>Fahrzeug<select id="fuelCar"></select></label>
-            <div class="two"><label>Datum<input id="fuelDate" type="date"></label><label>Kilometer<input id="fuelKm" type="number" min="0"></label></div>
-            <div class="two"><label>Liter<input id="fuelLiters" type="number" min="0" step="0.01"></label><label>Gesamtpreis €<input id="fuelCost" type="number" min="0" step="0.01"></label></div>
-            <label>Tankbeleg <span class="muted">(optional, Bild oder PDF bis 15 MB)</span><input id="fuelReceipt" type="file" accept="image/*,application/pdf,.pdf"></label>
-            <button class="primary" type="submit">Tankung speichern</button>
-          </form>
+      <div class="fuel-hub-head card">
+        <div>
+          <span class="feature-kicker">JIGGY FUEL</span>
+          <h2>Tankzentrale</h2>
+          <p class="muted">Tankungen, eigene Preisbeobachtung und Tankgutscheine an einem Ort.</p>
         </div>
-        <div class="card">
-          <div class="card-head"><h3>Tankverlauf</h3></div>
-          <div id="fuelList" class="simple-list"></div>
+        <div class="fuel-hub-stats">
+          <div><span>Letzter Literpreis</span><strong id="fuelHubLastPrice">–</strong></div>
+          <div><span>Gutschein-Guthaben</span><strong id="fuelHubVoucherTotal">0,00 €</strong></div>
+        </div>
+      </div>
+
+      <div class="fuel-tabs card">
+        <button class="fuel-tab active" type="button" data-fuel-tab="entries">⛽ Tankvorgänge</button>
+        <button class="fuel-tab" type="button" data-fuel-tab="prices">📍 Tankpreise</button>
+        <button class="fuel-tab" type="button" data-fuel-tab="vouchers">🎟 Gutscheine</button>
+      </div>
+
+      <div class="fuel-tab-panel active" data-fuel-panel="entries">
+        <div class="section-grid">
+          <div class="card">
+            <div class="card-head"><div><h3>Tankung eintragen</h3><p class="muted">Optional mit Tankstelle und Gutschein.</p></div></div>
+            <form id="fuelForm">
+              <label>Fahrzeug<select id="fuelCar"></select></label>
+              <div class="two">
+                <label>Datum<input id="fuelDate" type="date"></label>
+                <label>Kilometer<input id="fuelKm" type="number" min="0"></label>
+              </div>
+              <div class="two">
+                <label>Kraftstoff
+                  <select id="fuelType">
+                    <option>Diesel</option>
+                    <option>Super E5</option>
+                    <option>Super E10</option>
+                    <option>Super Plus</option>
+                    <option>Autogas LPG</option>
+                    <option>HVO100</option>
+                    <option>Sonstiges</option>
+                  </select>
+                </label>
+                <label>Tankstelle<input id="fuelStation" placeholder="z. B. Shell Wesel"></label>
+              </div>
+              <div class="two">
+                <label>Liter<input id="fuelLiters" type="number" min="0" step="0.01"></label>
+                <label>Gesamtpreis €<input id="fuelCost" type="number" min="0" step="0.01"></label>
+              </div>
+              <div class="fuel-price-preview">
+                <span>Berechneter Literpreis</span>
+                <strong id="fuelCalculatedPrice">–</strong>
+              </div>
+              <div class="fuel-voucher-use">
+                <label>Tankgutschein
+                  <select id="fuelVoucher">
+                    <option value="">Kein Gutschein</option>
+                  </select>
+                </label>
+                <label>Vom Gutschein bezahlt €<input id="fuelVoucherAmount" type="number" min="0" step="0.01" value="0"></label>
+              </div>
+              <small id="fuelVoucherHint" class="form-hint">Optional. Das Restguthaben wird beim Speichern automatisch reduziert.</small>
+              <label>Tankbeleg <span class="muted">(optional, Bild oder PDF bis 15 MB)</span><input id="fuelReceipt" type="file" accept="image/*,application/pdf,.pdf"></label>
+              <button class="primary" type="submit">Tankung speichern</button>
+            </form>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><div><h3>Tankverlauf</h3><p class="muted">Deine letzten Tankvorgänge für das aktive Fahrzeug.</p></div></div>
+            <div id="fuelList" class="simple-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="fuel-tab-panel" data-fuel-panel="prices">
+        <div class="card fuel-live-card">
+          <div class="card-head">
+            <div>
+              <span class="feature-kicker">TANKPULS · MTS-K</span>
+              <h3>Live-Tankpreise</h3>
+              <p class="muted">Aktuelle E5-, E10- und Dieselpreise in deiner Umgebung.</p>
+            </div>
+            <span id="fuelLiveState" class="status">BEREIT</span>
+          </div>
+
+          <div class="fuel-live-controls">
+            <div class="fuel-live-control-main">
+              <div class="fuel-location-actions">
+                <button class="primary" id="fuelUseLocation" type="button">◎ Standort verwenden</button>
+                <div class="fuel-location-manual">
+                  <input id="fuelManualLocation" placeholder="PLZ oder Ort, z. B. 46485 Wesel">
+                  <button class="btn" id="fuelUseManualLocation" type="button">Suchen</button>
+                </div>
+              </div>
+              <div id="fuelLocationLabel" class="fuel-location-label">Noch kein Standort gewählt.</div>
+            </div>
+
+            <label>Kraftstoff
+              <select id="fuelLiveType">
+                <option value="Diesel">Diesel</option>
+                <option value="E10">Super E10</option>
+                <option value="E5">Super E5</option>
+              </select>
+            </label>
+
+            <label>Radius
+              <select id="fuelLiveRadius">
+                <option value="5">5 km</option>
+                <option value="10" selected>10 km</option>
+                <option value="15">15 km</option>
+                <option value="25">25 km</option>
+              </select>
+            </label>
+
+            <label>Sortierung
+              <select id="fuelLiveSort">
+                <option value="price">Günstigste zuerst</option>
+                <option value="distance">Nächste zuerst</option>
+              </select>
+            </label>
+
+            <button class="btn" id="fuelLiveRefresh" type="button">↻ Aktualisieren</button>
+          </div>
+
+          <div class="fuel-live-summary">
+            <div><span>Regionaler Median</span><strong id="fuelLiveMedian">–</strong></div>
+            <div><span>Gefundene Stationen</span><strong id="fuelLiveCount">0</strong></div>
+            <div><span>Letzte Aktualisierung</span><strong id="fuelLiveUpdated">–</strong></div>
+          </div>
+
+          <div id="fuelLiveResults" class="fuel-live-results">
+            <div class="empty">Standort verwenden, um aktuelle Tankpreise zu laden.</div>
+          </div>
+
+          <div class="fuel-source-note">
+            Quelle: <a href="https://tankpuls.de" target="_blank" rel="noreferrer">TankPuls · MTS-K</a>
+          </div>
+        </div>
+
+        <div class="section-grid fuel-manual-grid">
+          <div class="card">
+            <div class="card-head">
+              <div><h3>Eigene Preisbeobachtung</h3><p class="muted">Preise manuell merken, falls du eine Station beobachten möchtest.</p></div>
+              <span class="status warn">MANUELL</span>
+            </div>
+            <form id="fuelPriceForm">
+              <label>Tankstelle<input id="fuelPriceStation" required placeholder="z. B. Aral Wesel"></label>
+              <div class="two">
+                <label>Kraftstoff
+                  <select id="fuelPriceType">
+                    <option>Diesel</option><option>Super E5</option><option>Super E10</option>
+                    <option>Super Plus</option><option>Autogas LPG</option><option>HVO100</option><option>Sonstiges</option>
+                  </select>
+                </label>
+                <label>Preis €/l<input id="fuelPriceValue" type="number" min="0" step="0.001" required placeholder="1,679"></label>
+              </div>
+              <div class="two">
+                <label>Ort / Bereich<input id="fuelPriceLocation" placeholder="z. B. Wesel"></label>
+                <label>Datum<input id="fuelPriceDate" type="date"></label>
+              </div>
+              <button class="primary" type="submit">Preis speichern</button>
+            </form>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><div><h3>Meine Tankpreise</h3><p class="muted">Gespeicherte Beobachtungen.</p></div></div>
+            <div id="fuelPriceList" class="fuel-price-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="fuel-tab-panel" data-fuel-panel="vouchers">
+        <div class="section-grid">
+          <div class="card">
+            <div class="card-head"><div><h3>Tankgutschein hinzufügen</h3><p class="muted">Guthaben lokal verwalten und beim Tanken verrechnen.</p></div></div>
+            <form id="fuelVoucherForm">
+              <div class="two">
+                <label>Anbieter<input id="fuelVoucherProvider" required placeholder="z. B. Shell"></label>
+                <label>Bezeichnung<input id="fuelVoucherName" placeholder="z. B. Geburtstagsgutschein"></label>
+              </div>
+              <div class="two">
+                <label>Guthaben €<input id="fuelVoucherBalance" type="number" min="0" step="0.01" required></label>
+                <label>Ablaufdatum<input id="fuelVoucherExpiry" type="date"></label>
+              </div>
+              <label>Code / Kartennummer<input id="fuelVoucherCode" placeholder="optional"></label>
+              <label>Notiz<input id="fuelVoucherNote" placeholder="optional"></label>
+              <button class="primary" type="submit">Gutschein speichern</button>
+            </form>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><div><h3>Meine Gutscheine</h3><p class="muted">Restguthaben und Laufzeit auf einen Blick.</p></div></div>
+            <div id="fuelVoucherList" class="fuel-voucher-list"></div>
+          </div>
         </div>
       </div>
     </section>
@@ -437,6 +780,10 @@
           <div class="card-head"><div><h3>Profil gestalten</h3><p class="muted">Du entscheidest, was öffentlich sichtbar ist.</p></div></div>
           <label>Fahrzeug<select id="profileCar"></select></label>
           <label>Profilname<input id="profileName" maxlength="40" placeholder="z. B. Jiggy's S4"></label>
+          <label>Dein JIGGY-Link
+            <div class="profile-slug-field"><span>jiggy-cloud.org/u/</span><input id="profileSlug" maxlength="30" autocomplete="off" spellcheck="false" placeholder="deinname"></div>
+            <small id="profileSlugStatus" class="profile-slug-status">3–30 Zeichen · a–z, 0–9, - und _</small>
+          </label>
           <label>Beschreibung<textarea id="profileBio" rows="4" maxlength="300" placeholder="Kurze Story zu deinem Build …"></textarea></label>
           <div class="profile-options">
             <label class="share-check"><input id="profileSpecs" type="checkbox" checked> Technische Daten</label>
@@ -464,7 +811,7 @@
 
 <section id="moreView" class="view">
       <div class="card jiggy-account-card">
-        <div class="card-head"><div><h3>JIGGY Account <span class="beta-badge">2.0 BETA</span></h3><p class="muted">Dein Account ist die Basis für Cloud-Sync, iPhone und iPad.</p></div><div class="account-head-status"><span id="accountStateBadge" class="account-state">Nicht angemeldet</span><span id="cloudConnectionBadge" class="cloud-connection checking">● Cloud wird geprüft</span></div></div>
+        <div class="card-head"><div><h3>JIGGY Account <span class="beta-badge">2.0 </span></h3><p class="muted">Dein Account ist die Basis für Cloud-Sync, iPhone und iPad.</p></div><div class="account-head-status"><span id="accountStateBadge" class="account-state">Nicht angemeldet</span><span id="cloudConnectionBadge" class="cloud-connection checking">● Cloud wird geprüft</span></div></div>
         <div id="accountLoggedOut">
           <div class="account-tabs"><button class="mini active" id="accountLoginTab" type="button">Anmelden</button><button class="mini" id="accountRegisterTab" type="button">Account erstellen</button></div>
           <form id="accountForm" class="account-form">
@@ -473,6 +820,7 @@
             <label>Passwort<input id="accountPassword" type="password" autocomplete="current-password" minlength="8" placeholder="Mindestens 8 Zeichen" required></label>
             <button class="primary" id="accountSubmit" type="submit">Anmelden</button>
           </form>
+          <button type="button" class="mini" id="accountForgotPassword">Passwort vergessen?</button>
           <div id="accountMessage" class="cloud-message">Noch nicht mit JIGGY Cloud verbunden.</div>
         </div>
         <div id="accountLoggedIn" hidden>
@@ -483,6 +831,11 @@
           </div>
           <div id="cloudImportStatus" class="cloud-message">Deine lokale Garage bleibt unverändert. Der erste Import erstellt nur Cloud-Kopien.</div>
         </div>
+      </div>
+
+      <div class="card invoice-settings-card" style="margin-top:14px">
+        <div class="card-head"><div><h3>Rechnungseinstellungen</h3><span>Absender, Bankverbindung und Rechnungsnummer</span></div><button class="primary" id="invoiceSettingsOpen" type="button">Bearbeiten</button></div>
+        <div id="invoiceSettingsSummary" class="invoice-settings-summary">Noch keine Rechnungsdaten geladen.</div>
       </div>
 
       <div class="card" style="margin-top:14px">
@@ -496,13 +849,298 @@
     </section>
   </main><div id="toastHost" class="toast-host"></div>
 
+
+<div class="spots-modal" id="spotsCreateModal" aria-hidden="true">
+  <div class="spots-modal-panel">
+    <div class="spots-modal-head">
+      <div>
+        <span class="feature-kicker">NEUER JIGGY SPOT</span>
+        <h2 id="spotsModalTitle">Spot hinzufügen</h2>
+        <p class="muted">Setze den Marker direkt auf der Karte und verschiebe ihn bei Bedarf per Drag & Drop.</p>
+      </div>
+      <button class="share-close" id="spotsModalClose" type="button" aria-label="Schließen">×</button>
+    </div>
+
+    <form id="spotsCreateForm" class="spots-form">
+      <div class="spots-kind-picker">
+        <label class="spots-kind active">
+          <input type="radio" name="spotType" value="photo" checked>
+          <span class="spots-kind-icon">📸</span>
+          <strong>Fotospot</strong>
+          <small>Coole Locations für Fahrzeugfotos</small>
+        </label>
+        <label class="spots-kind">
+          <input type="radio" name="spotType" value="meet">
+          <span class="spots-kind-icon">🚗</span>
+          <strong>Treffen</strong>
+          <small>Treffpunkte, Car Meets &amp; Events</small>
+        </label>
+      </div>
+
+      <div class="spots-form-grid">
+        <label class="span-2">Name
+          <input id="spotFormName" maxlength="120" required placeholder="z. B. Industriehafen Wesel">
+        </label>
+
+        <label>Kategorie
+          <select id="spotFormCategory">
+            <option value="Urban">Urban</option>
+            <option value="Industrie">Industrie</option>
+            <option value="Natur">Natur</option>
+            <option value="Parkhaus">Parkhaus</option>
+            <option value="Nacht">Nacht</option>
+            <option value="Aussicht">Aussicht</option>
+          </select>
+        </label>
+
+        <label>Sichtbarkeit
+          <select id="spotFormVisibility">
+            <option value="public">🌍 Öffentlich</option>
+            <option value="link">🔗 Nur per Link</option>
+            <option value="private">🔒 Privat</option>
+          </select>
+        </label>
+
+        <label class="span-2">Beschreibung
+          <textarea id="spotFormDescription" rows="4" maxlength="3000" placeholder="Was macht den Spot besonders? Zufahrt, beste Uhrzeit, Hinweise …"></textarea>
+        </label>
+
+        <div id="spotMeetFields" class="spots-meet-fields span-2" hidden>
+          <label>Start
+            <input id="spotFormStart" type="datetime-local">
+          </label>
+          <label>Ende
+            <input id="spotFormEnd" type="datetime-local">
+          </label>
+          <label class="spots-check">
+            <input id="spotFormRecurring" type="checkbox">
+            <span><strong>Regelmäßiger Treffpunkt</strong><small>Für wiederkehrende Treffen</small></span>
+          </label>
+        </div>
+
+        <label class="spots-check span-2">
+          <input id="spotFormCarAccessible" type="checkbox" checked>
+          <span><strong>Mit dem Auto erreichbar</strong><small>Der Pin kann direkt mit dem Fahrzeug angefahren werden.</small></span>
+        </label>
+
+        <div class="spots-coords span-2">
+          <div><small>POSITION</small><strong id="spotFormCoords">–</strong></div>
+          <button id="spotPickOnMap" type="button" class="btn">📍 Auf Karte setzen</button>
+        </div>
+
+        <label class="span-2 spots-upload">
+          <span>Fotos <small>optional · JPG, PNG, WEBP, HEIC</small></span>
+          <input id="spotFormImages" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple>
+          <span id="spotImageStatus" class="muted">Noch keine Fotos ausgewählt.</span>
+        </label>
+      </div>
+
+      <div id="spotFormMessage" class="cloud-message">Wähle einen Typ und trage deinen Spot ein.</div>
+
+      <div class="spots-modal-actions">
+        <button id="spotsModalCancel" class="btn" type="button">Abbrechen</button>
+        <button id="spotsModalSave" class="primary" type="submit">Spot speichern</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<div class="spots-modal" id="spotDetailModal" aria-hidden="true">
+  <div class="spot-detail-panel">
+    <button class="share-close spot-detail-close" id="spotDetailClose" type="button" aria-label="Schließen">×</button>
+
+    <div class="spot-detail-hero" id="spotDetailHero">
+      <div class="spot-detail-noimage" id="spotDetailNoImage">📍</div>
+      <img id="spotDetailImage" alt="" hidden>
+      <div class="spot-detail-badges">
+        <span id="spotDetailTypeBadge">📸 Fotospot</span>
+        <span id="spotDetailVisibilityBadge">🌍 Öffentlich</span>
+      </div>
+      <div class="spot-detail-counter" id="spotDetailCounter" hidden></div>
+      <button class="spot-detail-nav prev" id="spotDetailPrev" type="button" hidden>‹</button>
+      <button class="spot-detail-nav next" id="spotDetailNext" type="button" hidden>›</button>
+    </div>
+
+    <div class="spot-detail-body">
+      <div class="spot-detail-headline">
+        <div>
+          <span class="feature-kicker" id="spotDetailCategory">JIGGY SPOT</span>
+          <h2 id="spotDetailName">Spot</h2>
+        </div>
+        <button class="primary" id="spotDetailFly" type="button">📍 Auf Karte</button>
+      </div>
+
+      <p class="spot-detail-description" id="spotDetailDescription">–</p>
+
+      <div class="spot-detail-facts">
+        <div>
+          <small>ERREICHBARKEIT</small>
+          <strong id="spotDetailAccess">–</strong>
+        </div>
+        <div id="spotDetailDateWrap" hidden>
+          <small>TERMIN</small>
+          <strong id="spotDetailDate">–</strong>
+        </div>
+        <div id="spotDetailRecurringWrap" hidden>
+          <small>ART</small>
+          <strong id="spotDetailRecurring">–</strong>
+        </div>
+        <div>
+          <small>KOORDINATEN</small>
+          <strong id="spotDetailCoords">–</strong>
+        </div>
+      </div>
+
+      <div class="spot-detail-thumbs" id="spotDetailThumbs"></div>
+
+      <div class="spot-meet-card" id="spotMeetCard" hidden>
+        <div class="spot-meet-card-copy">
+          <small>JIGGY TREFFEN</small>
+          <strong id="spotMeetHeadline">Wer ist dabei?</strong>
+          <span id="spotMeetCount">Noch niemand eingetragen.</span>
+        </div>
+        <button class="primary" id="spotMeetJoin" type="button">🚗 Ich bin dabei</button>
+      </div>
+
+      <div class="spot-owner-actions" id="spotOwnerActions" hidden>
+        <div>
+          <small>DEIN SPOT</small>
+          <strong>Du hast diesen Spot erstellt.</strong>
+        </div>
+        <button class="danger" id="spotDetailDelete" type="button">🗑 Spot löschen</button>
+      </div>
+
+      <div id="spotDetailMessage" class="cloud-message">Spot wird geladen …</div>
+    </div>
+  </div>
+</div>
+
+
+<div class="jobs-modal" id="jobCreateModal" aria-hidden="true">
+  <div class="jobs-modal-panel">
+    <div class="jobs-modal-head">
+      <div><span class="feature-kicker">JIGGY JOBS</span><h2 id="jobEditorTitle">Neuer Auftrag</h2><p id="jobEditorSubtitle" class="muted">Kunde und Fahrzeug können komplett frei eingetragen werden.</p></div>
+      <button class="share-close" id="jobCreateClose" type="button">×</button>
+    </div>
+    <form id="jobCreateForm">
+      <div class="jobs-form-section"><span>Kunde</span>
+        <div class="two"><label>Name<input id="jobCustomerInput" required placeholder="Max Mustermann"></label><label>E-Mail<input id="jobCustomerEmail" type="email" placeholder="kunde@mail.de"></label></div>
+        <div class="two"><label>Telefon<input id="jobCustomerPhone" placeholder="+49 …"></label><label>Adresse<input id="jobCustomerAddress" placeholder="Straße, PLZ Ort"></label></div>
+      </div>
+      <div class="jobs-form-section"><span>Fahrzeug</span>
+        <div class="two"><label>Marke<input id="jobVehicleMake" required placeholder="BMW"></label><label>Modell<input id="jobVehicleModel" required placeholder="530i"></label></div>
+        <div class="two"><label>Kennzeichen<input id="jobVehiclePlate" placeholder="WES AB 123"></label><label>VIN<input id="jobVehicleVin" maxlength="17" placeholder="optional"></label></div>
+      </div>
+      <div class="jobs-form-section"><span>Auftrag</span>
+        <label>Titel<input id="jobTitleInput" required placeholder="Bremsen vorne wechseln"></label>
+        <label>Beschreibung<textarea id="jobDescriptionInput" rows="3" placeholder="Was soll gemacht werden?"></textarea></label>
+        <label>Notizen<textarea id="jobNotesInput" rows="2" placeholder="Interne Notizen"></textarea></label>
+      </div>
+      <div id="jobCreateMessage" class="cloud-message"></div>
+      <div class="jobs-modal-actions"><button class="btn" id="jobCreateCancel" type="button">Abbrechen</button><button class="primary" id="jobCreateSubmit" type="submit">Auftrag erstellen</button></div>
+    </form>
+  </div>
+</div>
+
+<div class="jobs-modal" id="jobWorkModal" aria-hidden="true">
+  <div class="jobs-modal-panel small">
+    <div class="jobs-modal-head"><div><span class="feature-kicker">ARBEITSZEIT</span><h2>Tätigkeit eintragen</h2></div><button class="share-close" id="jobWorkClose" type="button">×</button></div>
+    <form id="jobWorkForm">
+      <label>Tätigkeit<textarea id="jobWorkDescription" rows="3" required placeholder="z. B. Bremsscheiben und Beläge vorne gewechselt"></textarea></label>
+      <div class="two"><label>Stunden<input id="jobWorkHours" type="number" min="0" step="1" value="0"></label><label>Minuten<input id="jobWorkMinutes" type="number" min="0" max="59" step="1" value="30"></label></div>
+      <div class="two"><label>Stundensatz €<input id="jobWorkRate" type="number" min="0" step="0.01" value="40"></label><label>Datum<input id="jobWorkDate" type="date"></label></div>
+      <label class="jobs-check"><input id="jobWorkBillable" type="checkbox" checked> Dem Kunden berechnen</label>
+      <div id="jobWorkMessage" class="cloud-message"></div>
+      <div class="jobs-modal-actions"><button class="btn" id="jobWorkCancel" type="button">Abbrechen</button><button class="primary" type="submit">Arbeitszeit speichern</button></div>
+    </form>
+  </div>
+</div>
+
+<div class="jobs-modal" id="jobMaterialModal" aria-hidden="true">
+  <div class="jobs-modal-panel small">
+    <div class="jobs-modal-head"><div><span class="feature-kicker">MATERIAL</span><h2>Teil / Material</h2></div><button class="share-close" id="jobMaterialClose" type="button">×</button></div>
+    <form id="jobMaterialForm">
+      <label>Bezeichnung<input id="jobMaterialDescription" required placeholder="Bremsscheibe vorne"></label>
+      <label>Teilenummer<input id="jobMaterialPart" placeholder="optional"></label>
+      <div class="two"><label>Menge<input id="jobMaterialQty" type="number" min="0.01" step="0.01" value="1"></label><label>Preis pro Stück €<input id="jobMaterialPrice" type="number" min="0" step="0.01" value="0"></label></div>
+      <label>Einkaufspreis € <span class="muted">(nur intern)</span><input id="jobMaterialPurchase" type="number" min="0" step="0.01" placeholder="optional"></label>
+      <label>Notiz<input id="jobMaterialNotes" placeholder="optional"></label>
+      <label class="jobs-check"><input id="jobMaterialBillable" type="checkbox" checked> Dem Kunden berechnen</label>
+      <div id="jobMaterialMessage" class="cloud-message"></div>
+      <div class="jobs-modal-actions"><button class="btn" id="jobMaterialCancel" type="button">Abbrechen</button><button class="primary" type="submit">Material speichern</button></div>
+    </form>
+  </div>
+</div>
+
+
+<div class="jobs-modal" id="jobPaymentModal" aria-hidden="true">
+  <div class="jobs-modal-panel small">
+    <div class="jobs-modal-head">
+      <div><span class="feature-kicker">ZAHLUNG</span><h2>Job als bezahlt markieren</h2><p class="muted">Erfasse genau, was der Kunde bezahlt hat und ob Trinkgeld dabei war.</p></div>
+      <button class="share-close" id="jobPaymentClose" type="button">×</button>
+    </div>
+    <form id="jobPaymentForm">
+      <div class="job-payment-preview"><span>Auftragswert</span><strong id="jobPaymentOrderValue">0,00 €</strong></div>
+      <div class="two">
+        <label>Bezahlter Betrag €<input id="jobPaymentPaid" type="number" min="0" step="0.01" required></label>
+        <label>Trinkgeld €<input id="jobPaymentTip" type="number" min="0" step="0.01" value="0"></label>
+      </div>
+      <label>Zahlungsart
+        <select id="jobPaymentMethod">
+          <option value="cash">Bar</option><option value="bank_transfer">Überweisung</option><option value="paypal">PayPal</option><option value="card">Karte</option><option value="other">Sonstiges</option>
+        </select>
+      </label>
+      <div class="job-payment-live">
+        <div><span>Einnahme inkl. Trinkgeld</span><strong id="jobPaymentIncomePreview">0,00 €</strong></div>
+        <div><span>Voraussichtlicher Verdienst</span><strong id="jobPaymentProfitPreview">0,00 €</strong></div>
+      </div>
+      <div id="jobPaymentMessage" class="cloud-message"></div>
+      <div class="jobs-modal-actions"><button class="btn" id="jobPaymentCancel" type="button">Abbrechen</button><button class="primary" id="jobPaymentSubmit" type="submit">Zahlung speichern</button></div>
+    </form>
+  </div>
+</div>
+
+
+<div class="jobs-modal" id="invoiceSettingsModal" aria-hidden="true">
+  <div class="jobs-modal-panel">
+    <div class="jobs-modal-head">
+      <div><span class="feature-kicker">RECHNUNGEN</span><h2>Rechnungseinstellungen</h2><p class="muted">Accountgebundene Daten für deine Rechnungen.</p></div>
+      <button class="share-close" id="invoiceSettingsClose" type="button">×</button>
+    </div>
+    <form id="invoiceSettingsForm">
+      <div class="jobs-form-section"><span>Absender</span>
+        <div class="two"><label>Firma / Name<input id="invoiceBusinessName"></label><label>Inhaber<input id="invoiceOwnerName"></label></div>
+        <label>Straße & Hausnummer<input id="invoiceStreet"></label>
+        <div class="two"><label>PLZ<input id="invoicePostalCode"></label><label>Ort<input id="invoiceCity"></label></div>
+        <div class="two"><label>Land<input id="invoiceCountry" value="Deutschland"></label><label>E-Mail<input id="invoiceEmail" type="email"></label></div>
+        <label>Telefon<input id="invoicePhone"></label>
+      </div>
+      <div class="jobs-form-section"><span>Bankverbindung</span>
+        <div class="two"><label>IBAN<input id="invoiceIban"></label><label>BIC<input id="invoiceBic"></label></div>
+        <label>Bank<input id="invoiceBankName"></label>
+      </div>
+      <div class="jobs-form-section"><span>Rechnung</span>
+        <label>Rechnungspräfix<input id="invoicePrefix" maxlength="12" value="JIG"></label>
+      </div>
+      <div id="invoiceSettingsMessage" class="cloud-message"></div>
+      <div class="jobs-modal-actions">
+        <button class="btn" id="invoiceSettingsCancel" type="button">Abbrechen</button>
+        <button class="primary" id="invoiceSettingsSubmit" type="submit">Speichern</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script src="vehicle-db.js"></script>
-<script src="app.js"></script>
+<script src="app.js?v=216d-fuel-fallback"></script>
 
 <div id="mediaLightbox" class="media-lightbox" aria-hidden="true">
   <button id="mediaClose" class="media-close" type="button" onclick="closeMedia(); return false;" aria-label="Schließen">×</button>
   <div id="mediaStage" class="media-stage"></div>
 </div>
+
+
 
 <div class="share-modal" id="shareModal" aria-hidden="true">
   <div class="share-modal-panel">
@@ -553,5 +1191,10 @@
   <div class="vault-stage" id="vaultStage"></div>
 </div>
 
-</body>
+  <script src="https://unpkg.com/maplibre-gl@5.7.1/dist/maplibre-gl.js"></script>
+<dialog id="accountRecoveryDialog" aria-labelledby="accountRecoveryTitle">
+  <form id="accountRecoveryForm"><h2 id="accountRecoveryTitle">Passwort vergessen?</h2><p>Fordere einen Link für deinen JIGGY-Account an. Das neue Passwort gilt auf Handy und PC.</p>
+  <label>E-Mail<input name="email" type="email" autocomplete="email" maxlength="254" required></label>
+  <p role="status" aria-live="polite"></p><button class="primary" type="submit">Link anfordern</button><button class="mini" type="button" id="accountRecoveryCancel">Schließen</button></form>
+  </dialog><script src="account-recovery.js"></script></body>
 </html>

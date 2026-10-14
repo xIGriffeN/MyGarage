@@ -1,0 +1,13 @@
+JIGGY 2.1.1 — Stable UI + Jobs
+
+Basis: öffentliche JIGGY 2.1.0 Oberfläche.
+Neu:
+- Jobs / Aufträge
+- freie Kunden- und Fahrzeugdaten
+- Arbeitszeiten
+- Material + interner Einkaufspreis
+- Zahlungen, Trinkgeld, Einnahmen und Verdienst
+- Rechnung erstellen und PDF öffnen
+- vereinfachte Rechnungseinstellungen ohne Steuer/Zahlungsziel
+
+Keine UI-3.0/OEM-Redesign-Änderungen übernommen.
