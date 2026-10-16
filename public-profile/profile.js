@@ -6,14 +6,36 @@ async function run(){
  const id=new URLSearchParams(location.search).get("id");if(!id)return fail("Im Link fehlt die Profil-ID.");
  try{const r=await fetch(`${API_URL}/api/profiles/${encodeURIComponent(id)}`);if(r.status===404)return fail("Dieses Profil ist offline oder wurde gelöscht.");if(!r.ok)throw new Error(`HTTP ${r.status}`);const row=await r.json();render(row.profile||{},row.updatedAt,id)}catch(e){fail("Das Profil konnte gerade nicht geladen werden.")}
 }
+
+// JIGGY_GALLERY_1: only explicitly published snapshots; never request private media.
+function safeImage(value){
+ if(typeof value!=='string')return '';
+ if(/^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/=\s]+$/i.test(value)&&value.length<3000000)return value;
+ try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password?u.href:'';}catch{return '';}
+}
+function renderGallery(value){
+ const photos=(Array.isArray(value)?value:[]).map(p=>({image:safeImage(typeof p==='string'?p:p?.image),caption:typeof p?.caption==='string'?p.caption.slice(0,200):''})).filter(p=>p.image).slice(0,5);
+ if(!photos.length)return '';
+ return `<section class="section public-gallery" aria-label="Veröffentlichte Fahrzeuggalerie"><div class="section-head"><div><small>ALLE SEITEN DEINES BUILDS</small><h2>Galerie</h2></div><span>${photos.length} freigegebene Fotos</span></div><div class="public-gallery-track" tabindex="0" aria-label="Fotos durchwischen">${photos.map((p,i)=>`<figure><img src="${esc(p.image)}" alt="Fahrzeugfoto ${i+1}" loading="${i?'lazy':'eager'}" referrerpolicy="no-referrer">${p.caption?`<figcaption>${esc(p.caption)}</figcaption>`:''}</figure>`).join('')}</div><div class="public-gallery-controls"><button type="button" aria-label="Vorheriges Foto">←</button><span aria-live="polite">1 von ${photos.length}</span><button type="button" aria-label="Nächstes Foto">→</button></div></section>`;
+}
+function setupGallery(){
+ const section=root.querySelector('.public-gallery');if(!section)return;
+ const track=section.querySelector('.public-gallery-track'),prev=section.querySelector('[aria-label="Vorheriges Foto"]'),next=section.querySelector('[aria-label="Nächstes Foto"]'),status=section.querySelector('[aria-live]'),count=track.children.length;
+ let index=0;const update=()=>{index=Math.max(0,Math.min(count-1,Math.round(track.scrollLeft/track.clientWidth)));status.textContent=`${index+1} von ${count}`;prev.disabled=index===0;next.disabled=index===count-1;};
+ const go=i=>track.scrollTo({left:Math.max(0,Math.min(count-1,i))*track.clientWidth,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
+ prev.onclick=()=>go(index-1);next.onclick=()=>go(index+1);track.addEventListener('scroll',update);track.addEventListener('keydown',e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();go(index+(e.key==='ArrowRight'?1:-1));}});update();
+}
+
 function render(p,updated,slug){
- const c=p.car||{},s=c.specs||{},mods=Array.isArray(p.mods)?p.mods:[],theme=esc(p.theme||"signature");
+ const c=p.car||{},s=c.specs||{},mods=Array.isArray(p.mods)?p.mods:[],theme=["signature","street","clean"].includes(p.theme)?p.theme:"signature",heroImage=safeImage(c.image);
  const specItems=[s.power&&[s.power,"PS"],s.torque&&[s.torque,"NM"],c.year&&[c.year,"Baujahr"],s.fuel&&[s.fuel,"Kraftstoff"],s.gearbox&&[s.gearbox,"Getriebe"]].filter(Boolean);
  root.innerHTML=`<div class="theme-${theme}"><div class="top"><div class="brand">JIGGY<i>.</i></div><div class="tag">YOUR CAR. YOUR STORY.</div></div>
- <section class="hero"><div class="hero-media">${c.image?`<img src="${c.image}" alt="${esc(p.displayName||"")}">`:`<div class="fallback">JIGGY.</div>`}</div><span class="profile-id">JIGGY PUBLIC PROFILE</span><div class="hero-content"><div class="eyebrow">JIGGY IDENTITY</div><h1>${esc(p.displayName||[c.make,c.model,c.variant].filter(Boolean).join(" ")||"Vehicle")}</h1>${p.bio?`<div class="bio">${esc(p.bio)}</div>`:""}<div class="chips">${[c.make,c.model,c.variant,c.plate].filter(Boolean).map(x=>`<span>${esc(x)}</span>`).join("")}</div></div></section>
+ <section class="hero"><div class="hero-media">${heroImage?`<img referrerpolicy="no-referrer" src="${esc(heroImage)}" alt="${esc(p.displayName||"")}">`:`<div class="fallback">JIGGY.</div>`}</div><span class="profile-id">JIGGY PUBLIC PROFILE</span><div class="hero-content"><div class="eyebrow">JIGGY IDENTITY</div><h1>${esc(p.displayName||[c.make,c.model,c.variant].filter(Boolean).join(" ")||"Vehicle")}</h1>${p.bio?`<div class="bio">${esc(p.bio)}</div>`:""}<div class="chips">${[c.make,c.model,c.variant,c.plate].filter(Boolean).map(x=>`<span>${esc(x)}</span>`).join("")}</div></div></section>
  ${specItems.length?`<section class="section"><div class="section-head"><div><small>PERFORMANCE</small><h2>Vehicle Specs</h2></div><span>Die freigegebenen Daten dieses Builds</span></div><div class="specs">${specItems.map(x=>`<div class="spec"><b>${esc(x[0])}</b><span>${esc(x[1])}</span></div>`).join("")}</div></section>`:""}
  ${(c.mileage!==null&&c.mileage!==undefined)||c.plate?`<section class="section"><div class="section-head"><div><small>IDENTITY</small><h2>Vehicle Details</h2></div><span>Vom Besitzer freigegeben</span></div><div class="public-details">${c.mileage!==null&&c.mileage!==undefined?`<div><span>Kilometerstand</span><b>${Number(c.mileage||0).toLocaleString("de-DE")} km</b></div>`:""}${c.plate?`<div><span>Kennzeichen</span><b>${esc(c.plate)}</b></div>`:""}</div></section>`:""}
  ${mods.length?`<section class="section"><div class="section-head"><div><small>THE BUILD</small><h2>Umbauten</h2></div><span>${mods.length} ${mods.length===1?"Mod":"Mods"}</span></div><div class="build-grid">${mods.map((x,i)=>`<div class="build"><small>${esc(x.category||`MOD ${String(i+1).padStart(2,"0")}`)}</small><b>${esc(x.name)}</b>${x.date?`<time>${fmtDate(x.date)}</time>`:""}</div>`).join("")}</div></section>`:""}
+ ${renderGallery(p.gallery)}
  <div class="footer"><span>Made with JIGGY. · Your car. Your story.</span><span>${updated?`Updated ${fmtDate(updated)}`:""}</span></div></div>`;
+ setupGallery();
 }
 run();
