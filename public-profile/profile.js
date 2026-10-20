@@ -54,6 +54,7 @@ run();
 
 
 function setupShowcase(){
+ document.body.classList.toggle('public-clean',Boolean(root.querySelector('.theme-clean')));
  const sections=[['.public-gallery','galerie','Galerie'],['.showcase-highlights','highlights','Highlights'],['.specs','daten','Daten'],['.build-grid','umbauten','Umbauten']];
  const nav=document.createElement('nav');nav.className='showcase-nav';nav.setAttribute('aria-label','Fahrzeugprofil Bereiche');
  for(const [selector,id,label] of sections){const node=root.querySelector(selector);if(!node)continue;const section=node.closest('section');section.id=id;const a=document.createElement('a');a.href='#'+id;a.textContent=label;nav.append(a);}
