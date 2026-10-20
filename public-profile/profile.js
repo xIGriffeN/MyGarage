@@ -1,3 +1,4 @@
+import {publicSaleSnapshot,salePrice,saleContact} from './public-sale.js?v=55';
 const API_URL="https://api.jiggy-cloud.org",root=document.getElementById("app");
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 function fail(msg){root.innerHTML=`<div class="error"><b>JIGGY.</b><h2>Profil nicht verfügbar</h2><p>${esc(msg)}</p></div>`}
@@ -36,10 +37,11 @@ function renderHighlights(profile){
 }
 
 function render(p,updated,slug){
- const c=p.car||{},s=c.specs||{},mods=Array.isArray(p.mods)?p.mods:[],theme=["signature","street","clean"].includes(p.theme)?p.theme:"signature",heroImage=safeImage(c.image);
+ const c=p.car||{},s=c.specs||{},mods=Array.isArray(p.mods)?p.mods:[],theme=["signature","street","clean"].includes(p.theme)?p.theme:"signature",heroImage=safeImage(c.image),sale=publicSaleSnapshot(p.sale);
  const specItems=[s.power&&[s.power,"PS"],s.torque&&[s.torque,"NM"],c.year&&[c.year,"Baujahr"],s.fuel&&[s.fuel,"Kraftstoff"],s.gearbox&&[s.gearbox,"Getriebe"]].filter(Boolean);
  root.innerHTML=`<div class="theme-${theme}"><div class="top"><div class="brand">JIGGY<i>.</i></div><div class="tag">YOUR CAR. YOUR STORY.</div></div>
- <section class="hero"><div class="hero-media">${heroImage?`<img referrerpolicy="no-referrer" src="${esc(heroImage)}" alt="${esc(p.displayName||"")}">`:`<div class="fallback">JIGGY.</div>`}</div><span class="profile-id">JIGGY PUBLIC PROFILE</span><div class="hero-content"><div class="eyebrow">JIGGY IDENTITY</div><h1>${esc(p.displayName||[c.make,c.model,c.variant].filter(Boolean).join(" ")||"Vehicle")}</h1>${p.bio?`<div class="bio">${esc(p.bio)}</div>`:""}<div class="chips">${[c.make,c.model,c.variant,c.plate].filter(Boolean).map(x=>`<span>${esc(x)}</span>`).join("")}</div></div></section>
+ <section class="hero"><div class="hero-media">${heroImage?`<img referrerpolicy="no-referrer" src="${esc(heroImage)}" alt="${esc(p.displayName||"")}">`:`<div class="fallback">JIGGY.</div>`}</div>${sale?'<span class="public-for-sale">ZU VERKAUFEN</span>':''}<span class="profile-id">JIGGY PUBLIC PROFILE</span><div class="hero-content"><div class="eyebrow">JIGGY IDENTITY</div><h1>${esc(p.displayName||[c.make,c.model,c.variant].filter(Boolean).join(" ")||"Vehicle")}</h1>${sale?`<div class="hero-sale-price">${esc(salePrice(sale))}</div>`:''}${p.bio?`<div class="bio">${esc(p.bio)}</div>`:""}<div class="chips">${[c.make,c.model,c.variant,c.plate].filter(Boolean).map(x=>`<span>${esc(x)}</span>`).join("")}</div></div></section>
+ ${renderSale(p.sale)}
  ${renderHighlights(p)}
  ${specItems.length?`<section class="section"><div class="section-head"><div><small>PERFORMANCE</small><h2>Technische Daten</h2></div><span>Die freigegebenen Daten dieses Builds</span></div><div class="specs">${specItems.map(x=>`<div class="spec"><b>${esc(x[0])}</b><span>${esc(x[1])}</span></div>`).join("")}</div></section>`:""}
  ${(c.mileage!==null&&c.mileage!==undefined)||c.plate?`<section class="section"><div class="section-head"><div><small>IDENTITY</small><h2>Fahrzeugdetails</h2></div><span>Vom Besitzer freigegeben</span></div><div class="public-details">${c.mileage!==null&&c.mileage!==undefined?`<div><span>Kilometerstand</span><b>${Number(c.mileage||0).toLocaleString("de-DE")} km</b></div>`:""}${c.plate?`<div><span>Kennzeichen</span><b>${esc(c.plate)}</b></div>`:""}</div></section>`:""}
@@ -55,7 +57,7 @@ run();
 
 function setupShowcase(){
  document.body.classList.toggle('public-clean',Boolean(root.querySelector('.theme-clean')));
- const sections=[['.public-gallery','galerie','Galerie'],['.showcase-highlights','highlights','Highlights'],['.specs','daten','Daten'],['.build-grid','umbauten','Umbauten']];
+ const sections=[['.public-sale-view','angebot','Verkauf'],['.public-gallery','galerie','Galerie'],['.showcase-highlights','highlights','Highlights'],['.specs','daten','Daten'],['.build-grid','umbauten','Umbauten']];
  const nav=document.createElement('nav');nav.className='showcase-nav';nav.setAttribute('aria-label','Fahrzeugprofil Bereiche');
  for(const [selector,id,label] of sections){const node=root.querySelector(selector);if(!node)continue;const section=node.closest('section');section.id=id;const a=document.createElement('a');a.href='#'+id;a.textContent=label;nav.append(a);}
  const share=document.createElement('button');share.type='button';share.textContent='Profil teilen';share.className='showcase-share';nav.append(share);
@@ -73,4 +75,10 @@ function setupShowcase(){
  dialog.addEventListener('keydown',e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();show(index+(e.key==='ArrowRight'?1:-1));}});
  dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close();});dialog.addEventListener('close',()=>{document.body.classList.remove('lightbox-open');opener?.focus();});
  photos.forEach((figure,i)=>{const original=figure.querySelector('img'),button=document.createElement('button');button.type='button';button.className='gallery-open';button.setAttribute('aria-label','Fahrzeugfoto '+(i+1)+' vergrößern');original.before(button);button.append(original);button.onclick=()=>{show(i);opener=button;dialog.showModal();document.body.classList.add('lightbox-open');};});
+}
+
+
+function renderSale(value){
+ const sale=publicSaleSnapshot(value);if(!sale)return '';const contact=saleContact(sale.contact);
+ return `<section id="angebot" class="section public-sale-view" aria-label="Fahrzeugangebot"><div class="section-head"><div><small>DIESER BUILD SUCHT EIN NEUES ZUHAUSE</small><h2>Zu verkaufen</h2></div><span>Angaben des Besitzers</span></div><div class="sale-view-grid"><div><strong class="sale-view-price">${esc(salePrice(sale))}</strong><p class="sale-view-description">${esc(sale.description)}</p></div><aside><small>INTERESSE AN DIESEM AUTO?</small><h3>Direkt Kontakt aufnehmen</h3><p>${esc(contact.display)}</p><a class="sale-contact-button" href="${esc(contact.href)}" ${contact.kind==='url'?'target="_blank" rel="noopener noreferrer nofollow"':''}>${esc(contact.label)} ↗</a><span>Du kontaktierst den Besitzer über seinen gewählten Kontaktweg.</span></aside></div></section>`;
 }
