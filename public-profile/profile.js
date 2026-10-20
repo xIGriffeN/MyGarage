@@ -11,7 +11,7 @@ async function run(){
 function safeImage(value){
  if(typeof value!=='string')return '';
  if(/^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/=\s]+$/i.test(value)&&value.length<3000000)return value;
- try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password?u.href:'';}catch{return '';}
+ try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password&&!u.pathname.startsWith('/api/media')?u.href:'';}catch{return '';}
 }
 function renderGallery(value){
  const photos=(Array.isArray(value)?value:[]).map(p=>({image:safeImage(typeof p==='string'?p:p?.image),caption:typeof p?.caption==='string'?p.caption.slice(0,200):''})).filter(p=>p.image).slice(0,5);
@@ -26,16 +26,26 @@ function setupGallery(){
  prev.onclick=()=>go(index-1);next.onclick=()=>go(index+1);track.addEventListener('scroll',update);track.addEventListener('keydown',e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();go(index+(e.key==='ArrowRight'?1:-1));}});update();
 }
 
+
+// Only explicit public snapshots; no garage or private media requests.
+function renderHighlights(profile){
+ const mods=Array.isArray(profile.mods)?profile.mods:[],allowed=new Set(mods.filter(Boolean).map(mod=>String(mod.name||'')+'\0'+String(mod.category||''))),seen=new Set();
+ const items=(Array.isArray(profile.showcase?.highlights)?profile.showcase.highlights:[]).filter(item=>{if(!item||typeof item.name!=='string')return false;const key=item.name+'\0'+String(item.category||'');if(!allowed.has(key)||seen.has(key))return false;seen.add(key);return true;}).slice(0,3);
+ if(!items.length)return '';
+ return `<section class="section showcase-highlights" aria-label="Umbau-Highlights"><div class="section-head"><div><small>DAS MACHT DEN BUILD BESONDERS</small><h2>Umbau-Highlights</h2></div><span>Vom Besitzer ausgewählt</span></div><div class="showcase-highlight-grid">${items.map(item=>{const image=safeImage(item.image);return `<article class="showcase-highlight">${image?`<img src="${esc(image)}" alt="${esc(item.name.slice(0,200))}" loading="lazy" referrerpolicy="no-referrer">`:''}<div><small>${esc(String(item.category||'UMBAU').slice(0,100))}</small><h3>${esc(item.name.slice(0,200))}</h3>${item.description?`<p>${esc(String(item.description).slice(0,240))}</p>`:''}</div></article>`;}).join('')}</div></section>`;
+}
+
 function render(p,updated,slug){
  const c=p.car||{},s=c.specs||{},mods=Array.isArray(p.mods)?p.mods:[],theme=["signature","street","clean"].includes(p.theme)?p.theme:"signature",heroImage=safeImage(c.image);
  const specItems=[s.power&&[s.power,"PS"],s.torque&&[s.torque,"NM"],c.year&&[c.year,"Baujahr"],s.fuel&&[s.fuel,"Kraftstoff"],s.gearbox&&[s.gearbox,"Getriebe"]].filter(Boolean);
  root.innerHTML=`<div class="theme-${theme}"><div class="top"><div class="brand">JIGGY<i>.</i></div><div class="tag">YOUR CAR. YOUR STORY.</div></div>
  <section class="hero"><div class="hero-media">${heroImage?`<img referrerpolicy="no-referrer" src="${esc(heroImage)}" alt="${esc(p.displayName||"")}">`:`<div class="fallback">JIGGY.</div>`}</div><span class="profile-id">JIGGY PUBLIC PROFILE</span><div class="hero-content"><div class="eyebrow">JIGGY IDENTITY</div><h1>${esc(p.displayName||[c.make,c.model,c.variant].filter(Boolean).join(" ")||"Vehicle")}</h1>${p.bio?`<div class="bio">${esc(p.bio)}</div>`:""}<div class="chips">${[c.make,c.model,c.variant,c.plate].filter(Boolean).map(x=>`<span>${esc(x)}</span>`).join("")}</div></div></section>
- ${specItems.length?`<section class="section"><div class="section-head"><div><small>PERFORMANCE</small><h2>Vehicle Specs</h2></div><span>Die freigegebenen Daten dieses Builds</span></div><div class="specs">${specItems.map(x=>`<div class="spec"><b>${esc(x[0])}</b><span>${esc(x[1])}</span></div>`).join("")}</div></section>`:""}
- ${(c.mileage!==null&&c.mileage!==undefined)||c.plate?`<section class="section"><div class="section-head"><div><small>IDENTITY</small><h2>Vehicle Details</h2></div><span>Vom Besitzer freigegeben</span></div><div class="public-details">${c.mileage!==null&&c.mileage!==undefined?`<div><span>Kilometerstand</span><b>${Number(c.mileage||0).toLocaleString("de-DE")} km</b></div>`:""}${c.plate?`<div><span>Kennzeichen</span><b>${esc(c.plate)}</b></div>`:""}</div></section>`:""}
+ ${renderHighlights(p)}
+ ${specItems.length?`<section class="section"><div class="section-head"><div><small>PERFORMANCE</small><h2>Technische Daten</h2></div><span>Die freigegebenen Daten dieses Builds</span></div><div class="specs">${specItems.map(x=>`<div class="spec"><b>${esc(x[0])}</b><span>${esc(x[1])}</span></div>`).join("")}</div></section>`:""}
+ ${(c.mileage!==null&&c.mileage!==undefined)||c.plate?`<section class="section"><div class="section-head"><div><small>IDENTITY</small><h2>Fahrzeugdetails</h2></div><span>Vom Besitzer freigegeben</span></div><div class="public-details">${c.mileage!==null&&c.mileage!==undefined?`<div><span>Kilometerstand</span><b>${Number(c.mileage||0).toLocaleString("de-DE")} km</b></div>`:""}${c.plate?`<div><span>Kennzeichen</span><b>${esc(c.plate)}</b></div>`:""}</div></section>`:""}
  ${mods.length?`<section class="section"><div class="section-head"><div><small>THE BUILD</small><h2>Umbauten</h2></div><span>${mods.length} ${mods.length===1?"Mod":"Mods"}</span></div><div class="build-grid">${mods.map((x,i)=>`<div class="build"><small>${esc(x.category||`MOD ${String(i+1).padStart(2,"0")}`)}</small><b>${esc(x.name)}</b>${x.date?`<time>${fmtDate(x.date)}</time>`:""}</div>`).join("")}</div></section>`:""}
  ${renderGallery(p.gallery)}
- <div class="footer"><span>Made with JIGGY. · Your car. Your story.</span><span>${updated?`Updated ${fmtDate(updated)}`:""}</span></div></div>`;
+ <div class="footer"><span>Made with JIGGY. · Your car. Your story.</span><span>${updated?`Aktualisiert ${fmtDate(updated)}`:""}</span></div></div>`;
  setupGallery();
 }
 run();
