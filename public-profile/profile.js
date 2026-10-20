@@ -47,5 +47,30 @@ function render(p,updated,slug){
  ${renderGallery(p.gallery)}
  <div class="footer"><span>Made with JIGGY. · Your car. Your story.</span><span>${updated?`Aktualisiert ${fmtDate(updated)}`:""}</span></div></div>`;
  setupGallery();
+ setupShowcase();
+ document.title=(p.displayName||"Fahrzeugprofil")+" · JIGGY";
 }
 run();
+
+
+function setupShowcase(){
+ document.body.classList.toggle('public-clean',Boolean(root.querySelector('.theme-clean')));
+ const sections=[['.public-gallery','galerie','Galerie'],['.showcase-highlights','highlights','Highlights'],['.specs','daten','Daten'],['.build-grid','umbauten','Umbauten']];
+ const nav=document.createElement('nav');nav.className='showcase-nav';nav.setAttribute('aria-label','Fahrzeugprofil Bereiche');
+ for(const [selector,id,label] of sections){const node=root.querySelector(selector);if(!node)continue;const section=node.closest('section');section.id=id;const a=document.createElement('a');a.href='#'+id;a.textContent=label;nav.append(a);}
+ const share=document.createElement('button');share.type='button';share.textContent='Profil teilen';share.className='showcase-share';nav.append(share);
+ const notice=document.createElement('span');notice.className='showcase-share-notice';notice.setAttribute('role','status');nav.append(notice);
+ share.onclick=async()=>{notice.textContent='';try{if(navigator.share)await navigator.share({title:document.title,url:location.href});else{await navigator.clipboard.writeText(location.href);notice.textContent='Link kopiert';}}catch(e){if(e.name!=='AbortError')notice.textContent='Du kannst den Profil-Link aus der Adressleiste kopieren.';}};
+ root.querySelector('.hero').after(nav);
+ const photos=[...root.querySelectorAll('.public-gallery-track figure')];
+ if(!photos.length)return;
+ const dialog=document.createElement('dialog');dialog.className='showcase-lightbox';dialog.setAttribute('aria-label','Fahrzeugfoto in Großansicht');
+ const close=document.createElement('button');close.textContent='Schließen ×';close.className='lightbox-close';close.type='button';close.onclick=()=>dialog.close();
+ const image=document.createElement('img');image.referrerPolicy='no-referrer';const caption=document.createElement('p');
+ const controls=document.createElement('div');controls.className='lightbox-controls';const prev=document.createElement('button'),next=document.createElement('button'),count=document.createElement('span');prev.textContent='←';next.textContent='→';prev.setAttribute('aria-label','Vorheriges Bild in Großansicht');next.setAttribute('aria-label','Nächstes Bild in Großansicht');count.setAttribute('aria-live','polite');controls.append(prev,count,next);dialog.append(close,image,caption,controls);root.append(dialog);
+ let index=0,opener=null;const show=i=>{index=Math.max(0,Math.min(photos.length-1,i));const original=photos[index].querySelector('img');image.src=original.src;image.alt=original.alt;caption.textContent=photos[index].querySelector('figcaption')?.textContent||'';count.textContent=(index+1)+' / '+photos.length;prev.disabled=index===0;next.disabled=index===photos.length-1;};
+ prev.onclick=()=>show(index-1);next.onclick=()=>show(index+1);
+ dialog.addEventListener('keydown',e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();show(index+(e.key==='ArrowRight'?1:-1));}});
+ dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close();});dialog.addEventListener('close',()=>{document.body.classList.remove('lightbox-open');opener?.focus();});
+ photos.forEach((figure,i)=>{const original=figure.querySelector('img'),button=document.createElement('button');button.type='button';button.className='gallery-open';button.setAttribute('aria-label','Fahrzeugfoto '+(i+1)+' vergrößern');original.before(button);button.append(original);button.onclick=()=>{show(i);opener=button;dialog.showModal();document.body.classList.add('lightbox-open');};});
+}
