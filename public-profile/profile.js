@@ -1,5 +1,5 @@
 import {publicSaleSnapshot,salePrice,saleContact} from './public-sale.js?v=55';
-const API_URL="https://api.jiggy-cloud.org",root=document.getElementById("app");
+const API_URL="https://api.jiggy-app.de",root=document.getElementById("app");
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 function fail(msg){root.innerHTML=`<div class="error"><b>JIGGY.</b><h2>Profil nicht verfügbar</h2><p>${esc(msg)}</p></div>`}
 const fmtDate=d=>{try{return new Date(d).toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"})}catch{return""}};

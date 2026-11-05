@@ -1569,7 +1569,7 @@ setInterval(()=>{checkCloudConnection();if(accountSession().token)syncCloudGarag
 document.addEventListener("visibilitychange",()=>{if(!document.hidden){checkCloudConnection();if(accountSession().token)syncCloudGarage({silent:true})}});
 
 /* Public Profile · JIGGY Cloud */
-const JIGGY_CLOUD={apiUrl:"https://api.jiggy-cloud.org",baseUrl:"https://xigriffen.github.io/MyGarage/"};
+const JIGGY_CLOUD={apiUrl:"https://api.jiggy-app.de",baseUrl:"https://xigriffen.github.io/MyGarage/"};
 function profileConfig(){try{return JSON.parse(localStorage.getItem(PROFILE_KEY)||"{}")}catch{return{}}}
 function saveProfileConfig(v){localStorage.setItem(PROFILE_KEY,JSON.stringify(v))}
 async function refreshPublicProfileAccountState(){
@@ -2040,7 +2040,7 @@ async function loadProfileSlug(){
     const out=await authCloudRequest("/api/profiles/me/slug");
     input.value=out.slug||"";
     status.textContent=out.slug
-      ? `Dein Profil: jiggy-cloud.org/u/${out.slug}`
+      ? `Dein Profil: jiggy-app.de/u/${out.slug}`
       : "Noch kein eigener Profil-Link vergeben.";
     status.className="profile-slug-status good";
   }catch(e){
@@ -2762,7 +2762,7 @@ $("copyProfileBtn")?.addEventListener("click",async()=>{
   }catch{}
 
   const url=slug
-    ? `https://jiggy-cloud.org/u/${encodeURIComponent(slug)}`
+    ? `https://jiggy-app.de/u/${encodeURIComponent(slug)}`
     : `${JIGGY_CLOUD.baseUrl}${JIGGY_CLOUD.baseUrl.includes("?")?"&":"?"}id=${encodeURIComponent(p.profileId)}`;
 
   try{
