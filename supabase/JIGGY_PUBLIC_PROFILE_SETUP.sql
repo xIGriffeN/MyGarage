@@ -1,3 +1,0 @@
--- DEPRECATED since JIGGY 1.9.4
--- Public profiles now use the self-hosted JIGGY Cloud API and PostgreSQL.
--- This file is intentionally kept as a placeholder so older Supabase setup code is removed from the repository.

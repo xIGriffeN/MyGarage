@@ -1,0 +1,24 @@
+# Abhaengigkeiten und Build-Ausgaben
+node_modules/
+dist/
+*.log
+
+# Zugangsdaten und private Schluessel
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+keystore.properties
+
+# Datenbank-Sicherungen
+*.dump
+*.sql.gz
+*.sqlite
+
+# Windows
+Thumbs.db
